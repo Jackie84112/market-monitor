@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大盤監控</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* 色票與卡片沿用宏觀監控儀表板，之後併回較省事 */
+  :root{--bg:#F6F5F2;--card:#FFFFFF;--ink:#22262B;--muted:#6B7178;--line:#E4E2DC;--accent:#B04A2F;
+    --up:#DC2626;--dn:#15803D;--chart:#2563EB;--soft:#FAF9F6;}
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;
+    margin:0;padding:0 16px 40px;font-size:14px;}
+  .wrap{max-width:1180px;margin:20px auto 0;display:flex;flex-direction:column;gap:14px;}
+  header{padding:4px 4px 0;}
+  h1{font-size:28px;margin:0;letter-spacing:.5px;}
+  .sub{color:var(--muted);font-size:13px;margin:4px 0 0;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0;}
+  .head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-bottom:10px;}
+  .head h2{font-size:17px;font-weight:500;margin:0;letter-spacing:.3px;}
+  .head span{color:var(--muted);font-size:12.5px;}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;line-height:1.5;font-variant-numeric:tabular-nums;}
+  th{font-size:12px;font-weight:400;color:var(--muted);letter-spacing:.5px;text-align:left;padding:6px 10px;border-bottom:1px solid var(--ink);white-space:nowrap;}
+  td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:0;}
+  tbody tr:hover{background:var(--soft);}
+  .n{text-align:right;white-space:nowrap;}
+  th.n{text-align:right;}
+  .up{color:var(--up);} .dn{color:var(--dn);} .mu{color:var(--muted);}
+  .tag{display:inline-block;font-size:11.5px;padding:0 6px;border-radius:5px;background:#FBF1DD;color:#92600F;margin-left:6px;}
+  small{font-size:12px;color:var(--muted);}
+  .name small{display:block;line-height:1.35;margin-top:1px;}
+  .grp td{background:var(--soft);font-size:12.5px;color:var(--muted);letter-spacing:.5px;padding:5px 10px;font-weight:500;}
+  .chip{display:inline-block;font-size:12px;line-height:1.6;padding:0 8px;border-radius:5px;background:#EFEEEA;color:#4B5158;white-space:nowrap;}
+  .chip.g{background:#E7F3EB;color:#15803D;} .chip.r{background:#FBEAEA;color:#C02323;}
+  /* 回補進度 */
+  .rt{position:relative;width:130px;height:8px;background:#EFEEEA;border-radius:4px;display:inline-block;vertical-align:middle;}
+  .rt i{position:absolute;left:0;top:0;bottom:0;background:var(--chart);border-radius:4px;}
+  .rt b{position:absolute;top:-2px;bottom:-2px;width:1px;background:#8C9096;}
+  .rtv{display:inline-block;width:46px;text-align:right;}
+  .multi{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:14px;}
+  .mc{min-width:0;border-top:1px solid var(--line);padding-top:10px;}
+  .mc h3{font-size:13.5px;font-weight:500;margin:0 0 4px;display:flex;justify-content:space-between;gap:8px;}
+  .plot{position:relative;width:100%;}
+  .spark{width:150px;}
+  svg{display:block;touch-action:pan-y;}
+  svg text{font-family:inherit;font-variant-numeric:tabular-nums;}
+  #tip{position:fixed;pointer-events:none;background:rgba(34,38,43,.94);color:#F2F1EE;border-radius:8px;padding:6px 10px;font-size:12.5px;line-height:1.5;display:none;z-index:9;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .notes{margin:12px 0 0;font-size:12px;color:var(--muted);line-height:1.6;}
+  .notes p{margin:2px 0;}
+  .st{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+  .warn{color:#C02323;}
+  @media (max-width:900px){.multi{grid-template-columns:repeat(2,1fr);} .two{grid-template-columns:1fr;}}
+  @media (max-width:640px){
+    .multi{grid-template-columns:1fr;}
+    table.cards thead{display:none;}
+    table.cards tr{display:block;padding:9px 0;border-bottom:1px solid var(--line);}
+    table.cards tbody tr:last-child{border-bottom:0;}
+    table.cards td{display:flex;justify-content:space-between;align-items:center;gap:12px;border:0;padding:2px 0;text-align:right;}
+    table.cards td::before{content:attr(data-l);color:var(--muted);font-size:12px;text-align:left;white-space:nowrap;}
+    table.cards td.name{display:block;text-align:left;font-weight:500;}
+    table.cards td.name::before{content:none;}
+    table.cards td.name small{font-weight:400;}
+    table.cards tr.grp{padding:0;border:0;}
+    table.cards tr.grp td{display:block;text-align:left;padding:5px 8px;}
+    table.cards tr.grp td::before{content:none;}
+    .spark{width:130px;}
+    .rt{width:96px;}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>大盤監控</h1>
+    <p class="sub" id="sub">讀取中…</p>
+    <div class="st" id="st"></div>
+  </header>
+
+  <section class="card">
+    <div class="head"><h2>指數位置</h2><span>能反彈多少：高點、前低與回補關卡</span></div>
+    <table class="cards"><thead><tr><th>指數</th><th class="n">最新</th><th class="n">當日</th><th class="n">距高點</th><th class="n">距前低</th><th>回補進度</th><th class="n">下一關卡</th><th class="n">大跌前收盤</th></tr></thead><tbody id="idx"></tbody></table>
+    <div class="multi" id="multi"></div>
+    <div class="notes">
+      <p>[註1]：波段高點＝近 6 個月最高收盤，前低＝高點之後最低收盤，回補關卡＝前低往高點的 38.2%、50%、61.8%；關卡只是算術參考，不是預測。</p>
+      <p>[註2]：大跌前收盤＝近 10 個交易日最大單日跌幅（≥2%）的前一日收盤。盤中數字只顯示，不列入高低點計算。</p>
+      <p>[註3]：0050 用還原股價（含分割與配息），其他為指數收盤。</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>隔夜傳導</h2><span>現貨休市時的方向參考；預警用，判斷仍以現貨收盤為準</span></div>
+    <table class="cards"><thead><tr><th>標的</th><th class="n">最新</th><th class="n">漲跌</th><th>報價時間（台灣）</th><th>備註</th></tr></thead><tbody id="on"></tbody></table>
+    <div class="notes">
+      <p>[註1]：期貨漲跌為對前一個交易日結算，來源 Yahoo，可能有延遲。台指期夜盤與 SOX 期貨尚無免費來源，先以台積電 ADR 替代。</p>
+      <p>[註2]：ADR 1 股＝台積電 5 股；溢價用最新匯率與最近一筆台股價計算，兩地收盤時間不同，僅供參考。</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>每日訊號</h2><span>力道還在不在：廣度、波動率、Put/Call、台股籌碼</span></div>
+    <table class="cards"><thead><tr><th>指標</th><th class="n">最新</th><th class="n">資料日</th><th class="n">變化</th><th>方向</th><th>近 60 筆走勢</th></tr></thead><tbody id="a"></tbody></table>
+    <div class="notes">
+      <p>[註1]：方向只描述近 5 個交易日的變化，不是買賣訊號，門檻尚未回測；好轉綠、惡化紅，上升、下降為好壞需配合其他指標判斷。</p>
+      <p>[註2]：融資餘額證交所於晚間公布，且註明應以隔日報表的「前日餘額」為準；維持率依公布當日餘額計算。</p>
+      <p>[註3]：美股沒有每日的三大法人資料，也沒有每日融資資料，所以籌碼只有台股。</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>反轉確認</h2><span>反彈還是反轉：債市有沒有跟著改善</span></div>
+    <table class="cards"><thead><tr><th>指標</th><th class="n">最新</th><th class="n">資料日</th><th class="n">變化</th><th>方向</th><th>近 60 筆走勢</th></tr></thead><tbody id="b"></tbody></table>
+    <div class="notes">
+      <p>[註1]：信用利差來自 FRED，通常比股市晚一個工作日。</p>
+      <p>[註2]：台灣債券 ETF 暫列四檔美債與投等債，待確認要追蹤哪些；折溢價與受益權單位尚未納入。</p>
+    </div>
+  </section>
+
+  <section class="two">
+    <div class="card">
+      <div class="head"><h2>Forward P/E</h2><span id="fwdSub"></span></div>
+      <table><thead><tr><th>板塊</th><th class="n">目前</th><th class="n">5 年均</th><th class="n">10 年均</th><th class="n">對 10 年均</th></tr></thead><tbody id="fwd"></tbody></table>
+      <div class="notes"><p>[註1]：手動更新，FactSet 每週五出新版。估值決定空間、不決定時點；便宜的前提是 EPS 預估不被下修。</p></div>
+    </div>
+    <div class="card">
+      <div class="head"><h2>Trailing P/E</h2><span>近四季已實現盈餘，月底</span></div>
+      <table><thead><tr><th>指數</th><th class="n">資料月</th><th class="n">目前</th><th class="n">10 年均</th><th class="n">對 10 年均</th></tr></thead><tbody id="trl"></tbody></table>
+      <div class="notes">
+        <p>[註1]：手動更新；尚未反映 11 月的跌幅與第三季財報。</p>
+        <p>[註2]：經理人現金與曝險尚未納入：NAAIM 已改訂閱制、BofA 調查需付費。</p>
+      </div>
+    </div>
+  </section>
+</div>
+<div id="tip"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const tip = $("tip");
+const fmt = (v, d = 2) => v == null ? "—" : Number(v).toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
+const sign = (v, d = 2, u = "") => v == null ? "—" : (v > 0 ? "+" : "") + fmt(v, d) + u;
+const cls = v => v > 0 ? "up" : v < 0 ? "dn" : "mu";
+const short = d => d ? d.slice(5).replace("-", "/") : "—";
+const twTime = t => t ? new Date(t * 1000).toLocaleString("zh-TW", {timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false}) : "—";
+const esc = s => String(s).replace(/&/g, "&amp;");
+
+// 單序列折線＋十字線提示：單一 y 軸，關卡只用淡虛線
+function line(el, s, o = {}) {
+  const W = Math.max(el.clientWidth, 80), H = o.h || 170, L = 4, R = o.labels ? 58 : 4, T = 8, B = o.labels ? 20 : 4;
+  let vals = s.map(p => p[1]);
+  (o.levels || []).forEach(l => vals.push(l.v));
+  let lo = Math.min(...vals), hi = Math.max(...vals);
+  if (hi === lo) { hi += 1; lo -= 1; }
+  const pad = (hi - lo) * .05; lo -= pad; hi += pad;
+  const X = i => L + (W - L - R) * i / Math.max(1, s.length - 1), Y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  let g = "";
+  let lastY = Infinity;   // 關卡由低到高畫，標籤太近就略過（線仍保留）
+  (o.levels || []).forEach(l => {
+    g += `<line x1="${L}" x2="${W - R}" y1="${Y(l.v)}" y2="${Y(l.v)}" stroke="#B9BDC2" stroke-width="1" stroke-dasharray="3 3"/>`;
+    if (lastY - Y(l.v) >= 12) {
+      g += `<text x="${W - R + 4}" y="${Y(l.v) + 3.5}" font-size="10.5" fill="#6B7178">${l.name}</text>`;
+      lastY = Y(l.v);
+    }
+  });
+  if (o.labels) {
+    [0, Math.floor((s.length - 1) / 2), s.length - 1].forEach((i, k) => {
+      g += `<text x="${X(i)}" y="${H - 5}" font-size="10.5" fill="#6B7178" text-anchor="${["start", "middle", "end"][k]}">${short(s[i][0])}</text>`;
+    });
+  }
+  const path = s.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p[1]).toFixed(1)).join("");
+  const n = s.length - 1;
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="${esc(o.name || "走勢")}">${g}
+    <path d="${path}" fill="none" stroke="var(--chart)" stroke-width="${o.labels ? 2 : 1.5}" stroke-linejoin="round"/>
+    <circle cx="${X(n)}" cy="${Y(s[n][1])}" r="${o.labels ? 3.5 : 2.5}" fill="var(--chart)" stroke="#fff" stroke-width="1.5"/>
+    <line class="ch" y1="${T}" y2="${H - B}" stroke="#8C9096" stroke-width="1" style="display:none"/>
+    <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
+  const svg = el.firstChild, ch = svg.querySelector(".ch");
+  svg.addEventListener("pointermove", e => {
+    const r = svg.getBoundingClientRect(), i = Math.max(0, Math.min(n, Math.round((e.clientX - r.left - L) / (W - L - R) * n)));
+    ch.setAttribute("x1", X(i)); ch.setAttribute("x2", X(i)); ch.style.display = "";
+    tip.innerHTML = `${s[i][0].replace(/-/g, "/")}　<b>${fmt(s[i][1], o.d ?? 2)}${o.u || ""}</b>`;
+    tip.style.display = "block";
+    const tw = tip.offsetWidth;
+    tip.style.left = Math.max(6, Math.min(innerWidth - tw - 6, e.clientX + 12)) + "px";
+    tip.style.top = e.clientY - 36 + "px";
+  });
+  svg.addEventListener("pointerleave", () => { ch.style.display = "none"; tip.style.display = "none"; });
+}
+
+function rowsHTML(rows) {
+  let html = "", grp = "";
+  for (const r of rows) {
+    if (r.group !== grp) { grp = r.group; html += `<tr class="grp"><td colspan="6">${grp}</td></tr>`; }
+    if (r.empty) { html += `<tr><td class="name">${r.label}<small>${r.tip || ""}</small></td><td colspan="5" class="mu">尚無資料</td></tr>`; continue; }
+    const d = r.digits ?? 2, m = r.method;
+    const lab = m === "sum5" ? "5 日累計" : m === "ma5" ? "5 日均變化" : "5 日變化";
+    const chip = r.dir === "好轉" ? "g" : r.dir === "惡化" ? "r" : "";
+    html += `<tr><td class="name">${esc(r.label)}<small>${r.tip || ""}</small></td>
+      <td class="n" data-l="最新">${fmt(r.last, d)}${r.unit || ""}</td>
+      <td class="n mu" data-l="資料日">${short(r.date)}</td>
+      <td class="n" data-l="變化"><small>${lab}</small> ${sign(r.measure, d === 0 ? 0 : m === "sum5" ? d : Math.min(d + 1, 3))}</td>
+      <td data-l="方向"><span class="chip ${chip}">${r.dir}</span></td>
+      <td data-l="走勢"><div class="spark plot" data-k="${r.key}"></div></td></tr>`;
+  }
+  return html;
+}
+
+let DATA;
+function drawCharts() {
+  if (!DATA) return;
+  DATA.indices.forEach(x => {
+    const lv = [...x.levels.map(l => ({name: l.name + " " + fmt(l.v, x.last < 1000 ? 1 : 0), v: l.v}))];
+    line($("m_" + x.key), x.series, {h: 180, labels: true, levels: lv.map(l => ({...l, name: l.name.split(" ")[0]})), d: x.last < 1000 ? 2 : 2, name: x.name});
+  });
+  document.querySelectorAll(".spark").forEach(el => {
+    const r = DATA.rows.find(y => y.key === el.dataset.k);
+    if (r && r.series.length > 1) line(el, r.series, {h: 34, d: r.digits ?? 2, u: r.unit || "", name: r.label});
+  });
+}
+
+Promise.all([fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json()),
+             fetch("data/manual.json", {cache: "no-store"}).then(r => r.json())]).then(([j, man]) => {
+  DATA = j;
+  $("sub").textContent = `S&P 500／Nasdaq-100／SOX／道瓊／0050／KOSPI　｜　資料更新：${j.updated}（台灣時間）`;
+  $("st").innerHTML = Object.entries(j.status).map(([k, v]) =>
+    `<span class="chip ${v.ok ? "" : "r"}" title="${v.err ? esc(v.err) : ""}">${k} ${v.ok ? "至" : "抓取失敗，沿用至"} ${short(v.asof)}</span>`).join("");
+
+  $("idx").innerHTML = j.indices.map(x => {
+    const d = x.last < 1000 ? 2 : 0;
+    const ticks = x.levels.map(l => `<b style="left:${parseFloat(l.name)}%"></b>`).join("");
+    return `<tr><td class="name">${esc(x.name)}${x.live ? '<span class="tag">盤中</span>' : ""}<small>高 ${fmt(x.peak[1], d)}（${short(x.peak[0])}）／低 ${fmt(x.low[1], d)}（${short(x.low[0])}）</small></td>
+      <td class="n" data-l="最新">${fmt(x.last, d)} <small>${short(x.date)}</small></td>
+      <td class="n ${cls(x.chg)}" data-l="當日">${sign(x.chg, 2, "%")}</td>
+      <td class="n ${cls(x.fromPeak)}" data-l="距高點">${sign(x.fromPeak, 1, "%")}</td>
+      <td class="n ${cls(x.fromLow)}" data-l="距前低">${sign(x.fromLow, 1, "%")}</td>
+      <td data-l="回補進度"><span><span class="rt"><i style="width:${Math.max(0, Math.min(100, x.retrace ?? 0))}%"></i>${ticks}</span><span class="rtv">${x.retrace == null ? "—" : fmt(x.retrace, 0) + "%"}</span></span></td>
+      <td class="n" data-l="下一關卡">${x.next ? `${x.next.name} ${fmt(x.next.v, d)} <small>${sign(x.next.dist, 1, "%")}</small>` : "—"}</td>
+      <td class="n" data-l="大跌前收盤">${x.gap ? `${fmt(x.gap.v, d)} <small>${short(x.gap.date)} ${sign(x.gap.drop, 1, "%")}</small>` : "—"}</td></tr>`;
+  }).join("");
+  $("multi").innerHTML = j.indices.map(x =>
+    `<div class="mc"><h3><span>${esc(x.name)}</span><small>${fmt(x.last, x.last < 1000 ? 2 : 0)}</small></h3><div class="plot" id="m_${x.key}"></div></div>`).join("");
+
+  $("on").innerHTML = j.overnight.map(o => `<tr><td class="name">${o.name}</td>
+      <td class="n" data-l="最新">${fmt(o.last, o.digits)}</td><td class="n ${cls(o.chg)}" data-l="漲跌">${sign(o.chg, 2, "%")}</td>
+      <td class="mu" data-l="報價時間">${twTime(o.time)}</td><td class="mu" data-l="備註">${o.extra || "—"}</td></tr>`).join("");
+
+  const A = ["廣度", "波動率", "Put/Call", "台股籌碼"];
+  $("a").innerHTML = rowsHTML(j.rows.filter(r => A.includes(r.group)));
+  $("b").innerHTML = rowsHTML(j.rows.filter(r => !A.includes(r.group)));
+
+  $("fwdSub").textContent = `${man.forward.source}（${man.forward.asof.replace(/-/g, "/")}）`;
+  const rel = (a, b) => b ? (a / b - 1) * 100 : null;
+  $("fwd").innerHTML = man.forward.rows.map(r => { const v = rel(r.pe, r.avg10);
+    return `<tr${r.total ? ' style="font-weight:500"' : ""}><td>${esc(r.name)}</td><td class="n">${fmt(r.pe, 1)}</td><td class="n mu">${fmt(r.avg5, 1)}</td><td class="n mu">${fmt(r.avg10, 1)}</td><td class="n ${cls(v)}">${sign(v, 1, "%")}</td></tr>`; }).join("");
+  $("trl").innerHTML = man.trailing.rows.map(r => { const v = rel(r.pe, r.avg10);
+    return `<tr><td>${esc(r.name)}</td><td class="n mu">${r.month}</td><td class="n">${fmt(r.pe, 2)}</td><td class="n mu">${fmt(r.avg10, 2)}</td><td class="n ${v == null ? "mu" : cls(v)}">${sign(v, 1, "%")}</td></tr>`; }).join("");
+
+  drawCharts();
+  let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(drawCharts, 150); });
+}).catch(e => { $("sub").innerHTML = `<span class="warn">資料讀取失敗：${e}</span>`; });
+</script>
+</body>
+</html>
