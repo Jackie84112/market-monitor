@@ -5,6 +5,7 @@
 - 每日逐筆才查得到的來源（Cboe、證交所、期交所）累積在 data/store.json，只補缺的日期。
 - 只用 requests，本機與 GitHub Actions 都能跑：python pipeline/build.py [--backfill 天數]
 """
+from zoneinfo import ZoneInfo
 import csv
 import datetime as dt
 import html
@@ -69,6 +70,22 @@ def yahoo(sym, adjusted=False):
     per, now = (m.get("currentTradingPeriod") or {}).get("regular") or {}, time.time()
     live = bool(per) and per["start"] <= now < per["end"] and rows[-1][0] == dt.datetime.fromtimestamp(now + off, dt.timezone.utc).strftime("%Y-%m-%d")
     return rows, live, m.get("regularMarketTime")
+
+
+def futures_line(sym):
+    """期貨當晚走勢：美股前一次收盤（15:45 那根 15 分 K 收在 16:00 ET）到最新報價。休市與維護時段沿用再前一次收盤。"""
+    r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{requests.utils.quote(sym)}?range=5d&interval=15m", headers=UA, timeout=40)
+    r.raise_for_status()
+    j = r.json()["chart"]["result"][0]
+    bars = [(t, c) for t, c in zip(j["timestamp"], j["indicators"]["quote"][0]["close"]) if c is not None]
+    if not bars:
+        return []
+    et = ZoneInfo("America/New_York")
+    closes = [t for t, _ in bars if (x := dt.datetime.fromtimestamp(t, et)).weekday() < 5 and x.strftime("%H:%M") == "15:45"]
+    start = next((t for t in reversed(closes) if bars[-1][0] - t >= 2.25 * 3600), None)
+    if start is None:
+        return []
+    return [[dt.datetime.fromtimestamp(t, TW).strftime("%m-%d %H:%M"), round(c, 2)] for t, c in bars if t >= start]
 
 
 # ---------------------------------------------------------------- FRED／財政部
@@ -357,10 +374,15 @@ def main():
 
     # 隔夜傳導
     overnight = []
-    for k, n, _ in FUTURES:
+    for k, n, sym in FUTURES:
         s = S(k)
         if len(s) >= 2:
-            overnight.append({"name": n, "last": s[-1][1], "chg": round((s[-1][1] / s[-2][1] - 1) * 100, 2), "time": mtime.get(k), "digits": 2})
+            try:
+                path = futures_line(sym)
+            except Exception as e:
+                print(f"期貨走勢 {sym} 失敗：{e}")
+                path = []
+            overnight.append({"key": k, "name": n, "last": s[-1][1], "chg": round((s[-1][1] / s[-2][1] - 1) * 100, 2), "time": mtime.get(k), "digits": 2, "line": path, "base": s[-2][1]})
     tsm, t2330, fx = S("tsm"), S("t2330"), S("usdtwd")
     if len(tsm) >= 2 and t2330 and fx:
         overnight.append({"name": "台積電 ADR", "last": tsm[-1][1], "chg": round((tsm[-1][1] / tsm[-2][1] - 1) * 100, 2), "time": mtime.get("tsm"), "digits": 2,
