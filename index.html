@@ -100,7 +100,7 @@
 
   <section class="card">
     <div class="head"><h2>每日訊號</h2><span>力道還在不在：廣度、波動率、Put/Call、台股籌碼</span></div>
-    <table class="cards"><thead><tr><th>指標</th><th class="n">最新</th><th class="n">資料日</th><th class="n">變化</th><th>方向</th><th>近 60 筆走勢</th></tr></thead><tbody id="a"></tbody></table>
+    <table class="cards"><thead><tr><th>指標</th><th class="n">最新</th><th class="n">資料日</th><th class="n">變化</th><th>方向</th><th>10/6 起走勢</th></tr></thead><tbody id="a"></tbody></table>
     <div class="notes">
       <p>[註1]：方向只描述近 5 個交易日的變化，不是買賣訊號，門檻尚未回測；好轉綠、惡化紅，上升、下降為好壞需配合其他指標判斷。</p>
       <p>[註2]：融資餘額證交所於晚間公布，且註明應以隔日報表的「前日餘額」為準；維持率依公布當日餘額計算。</p>
@@ -206,6 +206,8 @@ function rowsHTML(rows) {
   return html;
 }
 
+const DAILY_SPARK_START = "2026-10-06";   // 每日訊號迷你圖起始日（換波段時與 build.py 的 PEAK_DATE 一起改）
+
 let DATA;
 function drawCharts() {
   if (!DATA) return;
@@ -215,7 +217,8 @@ function drawCharts() {
   });
   document.querySelectorAll(".spark:not(.onspark)").forEach(el => {
     const r = DATA.rows.find(y => y.key === el.dataset.k);
-    if (r && r.series.length > 1) line(el, r.series, {h: 34, d: r.digits ?? 2, u: r.unit || "", name: r.label});
+    const s = r && el.closest("#a") ? r.series.filter(p => p[0] >= DAILY_SPARK_START) : r && r.series;
+    if (s && s.length > 1) line(el, s, {h: 34, d: r.digits ?? 2, u: r.unit || "", name: r.label});
   });
   document.querySelectorAll(".onspark").forEach(el => {
     const o = DATA.overnight.find(y => y.key === el.dataset.k);
