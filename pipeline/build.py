@@ -403,7 +403,7 @@ def main():
         row("pc_index", "美股指數 Put/Call", "Put/Call", take("cboe", "index"), method="ma5", flat=0.01, tip="較能反映法人避險"),
         row("pc_tw_oi", "台指選 Put/Call（未平倉）", "Put/Call", take("taifex", "oi"), unit="%", method="ma5", flat=1, tip="期交所買賣權未平倉比"),
         row("pc_tw_vol", "台指選 Put/Call（成交量）", "Put/Call", take("taifex", "vol"), unit="%", method="ma5", flat=1, tip="期交所買賣權成交量比"),
-        row("ratio", "大盤融資維持率", "台股籌碼", take("twse", "ratio"), unit="%", pol=1, flat=0.5, tip="160% 以上為正常水位。<br>140%-160% 為中型修正。<br>140% 以下為股災級修正，2020年疫情，2022年升息約為 140%。"),
+        row("ratio", "大盤融資維持率", "台股籌碼", take("twse", "ratio"), unit="%", pol=1, flat=0.5, tip="160% 以上為正常水位。<br>150%-160% 為中型修正。<br>150% 以下為股災級修正，2020年疫情，2022年升息約為 140%。"),
         row("fin", "融資餘額", "台股籌碼", take("twse", "fin"), unit=" 億", digits=0, flat=5, tip="下降代表去槓桿，好壞要配合維持率看"),
         row("fi", "外資買賣超（近 5 日累計）", "台股籌碼", take("twse", "fi"), unit=" 億", digits=0, pol=1, method="sum5", tip="最新欄為當日、變化欄為近 5 日累計"),
         row("it", "投信買賣超（近 5 日累計）", "台股籌碼", take("twse", "it"), unit=" 億", digits=0, pol=1, method="sum5", tip="最新欄為當日、變化欄為近 5 日累計"),
