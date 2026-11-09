@@ -30,7 +30,7 @@ RETRACE = (0.382, 0.5, 0.618)
 
 INDICES = [("spx", "S&P 500", "^GSPC"), ("ndx", "Nasdaq-100", "^NDX"), ("sox", "費城半導體 SOX", "^SOX"),
            ("dji", "道瓊工業", "^DJI"), ("t0050", "元大台灣 50（0050）", "0050.TW"), ("kospi", "韓國 KOSPI", "^KS11")]
-FUTURES = [("es", "S&P 500 期貨", "ES=F"), ("nq", "Nasdaq-100 期貨", "NQ=F"), ("ym", "道瓊期貨", "YM=F")]
+FUTURES = [("es", "S&P 500 期貨", "ES=F"), ("nq", "Nasdaq-100 期貨", "NQ=F"), ("ym", "道瓊期貨", "YM=F"), ("soxf", "費城半導體 SOX 期貨", "SOX=F")]
 BOND_ETF = [("b00679", "00679B 元大美債 20 年", "00679B.TWO"), ("b00687", "00687B 國泰 20 年美債", "00687B.TWO"),
             ("b00720", "00720B 元大投資級公司債", "00720B.TWO"), ("b00937", "00937B 群益 ESG 投等債 20+", "00937B.TWO")]
 OTHER_YAHOO = {"vix": "^VIX", "vix3m": "^VIX3M", "rsp": "RSP", "spy": "SPY", "tsm": "TSM", "t2330": "2330.TW", "usdtwd": "USDTWD=X"}
@@ -72,20 +72,63 @@ def yahoo(sym, adjusted=False):
     return rows, live, m.get("regularMarketTime")
 
 
-def futures_line(sym):
-    """期貨當晚走勢：美股前一次收盤（15:45 那根 15 分 K 收在 16:00 ET）到最新報價。休市與維護時段沿用再前一次收盤。"""
-    r = requests.get(f"https://query1.finance.yahoo.com/v8/finance/chart/{requests.utils.quote(sym)}?range=5d&interval=15m", headers=UA, timeout=40)
+def intraday(sym, prepost=False, gap=2.25 * 3600):
+    """15 分 K 走勢與最新一筆報價：從前一次美股收盤（15:45 那根收在 16:00 ET）到最新。
+    gap＝最新報價距收盤至少多久才換用該次收盤；期貨 18:00 ET 才開新盤，所以預設 2.25 小時。回傳 (走勢, 最新價, 最新時間)。"""
+    flag = "true" if prepost else "false"
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{requests.utils.quote(sym)}?range=5d&interval=15m&includePrePost={flag}"
+    r = requests.get(url, headers=UA, timeout=40)
     r.raise_for_status()
     j = r.json()["chart"]["result"][0]
     bars = [(t, c) for t, c in zip(j["timestamp"], j["indicators"]["quote"][0]["close"]) if c is not None]
     if not bars:
-        return []
-    et = ZoneInfo("America/New_York")
-    closes = [t for t, _ in bars if (x := dt.datetime.fromtimestamp(t, et)).weekday() < 5 and x.strftime("%H:%M") == "15:45"]
-    start = next((t for t in reversed(closes) if bars[-1][0] - t >= 2.25 * 3600), None)
-    if start is None:
-        return []
-    return [[dt.datetime.fromtimestamp(t, TW).strftime("%m-%d %H:%M"), round(c, 2)] for t, c in bars if t >= start]
+        return [], None, None
+    last_t, et = bars[-1][0], ZoneInfo("America/New_York")
+    day, start = dt.datetime.fromtimestamp(last_t, et).date(), None
+    for i in range(8):
+        d = day - dt.timedelta(days=i)
+        t = dt.datetime(d.year, d.month, d.day, 15, 45, tzinfo=et).timestamp()
+        if d.weekday() < 5 and last_t - t >= gap:
+            start = t
+            break
+    path = [[dt.datetime.fromtimestamp(t, TW).strftime("%m-%d %H:%M"), round(c, 2)] for t, c in bars if start is not None and t >= start]
+    return path, bars[-1][1], last_t
+
+
+def us_session(ts):
+    t = dt.datetime.fromtimestamp(ts, ZoneInfo("America/New_York")).strftime("%H:%M")
+    return "盤前" if t < "09:30" else "盤後" if t >= "16:00" else "正常盤"
+
+
+def taifex_txf():
+    """台指期近月：期交所報價接口，日盤（-F）與夜盤（-M）合併。夜盤過午夜仍記開盤日，時間早於 15:00 要加一天。"""
+    head = {**UA, "Content-Type": "application/json;charset=UTF-8", "Origin": "https://mis.taifex.com.tw", "Referer": "https://mis.taifex.com.tw/futures/"}
+    api = lambda ep, body: requests.post(f"https://mis.taifex.com.tw/futures/api/{ep}", json=body, headers=head, timeout=30).json()["RtData"]
+    sessions = []
+    for market, night in (("0", False), ("1", True)):
+        quotes = api("getQuoteList", {"MarketType": market, "SymbolType": "F", "KindID": "1", "CID": "TXF", "ExpireMonth": "", "RowSize": "3", "PageNo": "", "SortColumn": "", "AscDesc": "A"})["QuoteList"]
+        q = next((x for x in quotes if re.fullmatch(r"TXF[A-Z]\d-[FM]", x.get("SymbolID", "")) and x.get("CLastPrice") and x.get("CTime")), None)
+        if not q:
+            continue
+        base = dt.datetime.strptime(q["CDate"], "%Y%m%d").replace(tzinfo=TW)
+
+        def stamp(hhmmss, base=base, night=night):
+            h, m = int(hhmmss[:2]), int(hhmmss[2:4])     # 接口會出現 046000 這種寫法，用加法進位
+            return base + dt.timedelta(days=1 if night and h < 15 else 0, hours=h, minutes=m, seconds=int(hhmmss[4:6] or 0))
+
+        chart = api("getChartData1M", {"SymbolID": q["SymbolID"]})
+        bars = next((v for v in chart.values() if isinstance(v, list) and v and isinstance(v[0], list)), [])
+        sessions.append({"night": night, "ref": float(q["CRefPrice"]), "last": float(q["CLastPrice"]), "time": stamp(q["CTime"]),
+                         "bars": [(stamp(b[0]), float(b[4])) for b in bars if b[4]]})
+    if not sessions:
+        raise ValueError("期交所未回傳台指期報價")
+    sessions.sort(key=lambda x: x["time"])
+    cur = sessions[-1]
+    # 同一結算價底下的夜盤＋日盤接成一條線；新夜盤開始後只畫新夜盤
+    bars = sorted((b for x in sessions if x is cur or x["ref"] == cur["ref"] for b in x["bars"]), key=lambda b: b[0])
+    thin = [b for i, b in enumerate(bars) if i % 15 == 0 or i == len(bars) - 1]
+    return {"key": "txf_q", "name": "台指期（近月）", "last": cur["last"], "chg": round((cur["last"] / cur["ref"] - 1) * 100, 2), "time": int(cur["time"].timestamp()), "digits": 0,
+            "line": [[t.strftime("%m-%d %H:%M"), v] for t, v in thin], "base": cur["ref"], "extra": "夜盤" if cur["night"] else "日盤"}
 
 
 # ---------------------------------------------------------------- FRED／財政部
@@ -376,17 +419,31 @@ def main():
     overnight = []
     for k, n, sym in FUTURES:
         s = S(k)
-        if len(s) >= 2:
-            try:
-                path = futures_line(sym)
-            except Exception as e:
-                print(f"期貨走勢 {sym} 失敗：{e}")
-                path = []
-            overnight.append({"key": k, "name": n, "last": s[-1][1], "chg": round((s[-1][1] / s[-2][1] - 1) * 100, 2), "time": mtime.get(k), "digits": 2, "line": path, "base": s[-2][1]})
+        try:
+            path, last, last_t = intraday(sym)
+        except Exception as e:
+            print(f"期貨走勢 {sym} 失敗：{e}")
+            path, last, last_t = [], s[-1][1] if s else None, mtime.get(k)
+        base = path[0][1] if path else s[-2][1] if len(s) >= 2 else None   # 用走勢起點（前一次收盤）；Yahoo 日線有時缺當前這筆，不能靠倒數第二筆
+        if last is not None and base:
+            overnight.append({"key": k, "name": n, "last": last, "chg": round((last / base - 1) * 100, 2), "time": last_t, "digits": 2, "line": path, "base": base,
+                              "extra": "成交稀少，請留意報價時間" if k == "soxf" else None})
+    try:
+        overnight.append(taifex_txf())
+    except Exception as e:
+        print(f"台指期失敗：{e}")
+        overnight += [o for o in old.get("overnight", []) if o.get("key") == "txf_q"]   # 抓不到就沿用上次，報價時間會顯示舊值
     tsm, t2330, fx = S("tsm"), S("t2330"), S("usdtwd")
     if len(tsm) >= 2 and t2330 and fx:
-        overnight.append({"name": "台積電 ADR", "last": tsm[-1][1], "chg": round((tsm[-1][1] / tsm[-2][1] - 1) * 100, 2), "time": mtime.get("tsm"), "digits": 2,
-                          "extra": f"折合台幣 {tsm[-1][1] * fx[-1][1] / 5:,.0f} 元／股，對台股 {t2330[-1][1]:,.0f} 元溢價 {(tsm[-1][1] * fx[-1][1] / 5 / t2330[-1][1] - 1) * 100:+.1f}%"})
+        try:
+            path, last, last_t = intraday("TSM", prepost=True, gap=0)
+        except Exception as e:
+            print(f"ADR 走勢失敗：{e}")
+            path, last, last_t = [], None, None
+        last, last_t = last or tsm[-1][1], last_t or mtime.get("tsm")
+        base = tsm[-2][1] if live.get("tsm") else tsm[-1][1]     # 盤中對前一日收盤；盤前盤後對最近一次正常盤收盤
+        overnight.append({"key": "tsm_q", "name": "台積電 ADR", "last": last, "chg": round((last / base - 1) * 100, 2), "time": last_t, "digits": 2, "line": path, "base": base,
+                          "extra": f"{us_session(last_t)}；折合台幣 {last * fx[-1][1] / 5:,.0f} 元／股，對台股 {t2330[-1][1]:,.0f} 元溢價 {(last * fx[-1][1] / 5 / t2330[-1][1] - 1) * 100:+.1f}%"})
 
     indices = []
     for k, n, sym in INDICES:
