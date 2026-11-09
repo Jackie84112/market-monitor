@@ -394,8 +394,8 @@ def main():
         return [[d, v / den[d]] for d, v in S(a) if d in den]
 
     rows = [
-        row("rsp_spy", "等權重對市值加權（RSP÷SPY）", "廣度", [[d, v * 100] for d, v in ratio("rsp", "spy")], pol=1, flat=0.02, tip="上升代表多數股票走得比權值股強"),
-        row("up_share", "上市股票上漲家數占比", "廣度", upshare, unit="%", digits=1, pol=1, method="ma5", flat=1, tip="上漲÷（上漲＋下跌），看 5 日均方向"),
+        row("spy_rsp", "美股：市值加權對等權重（SPY÷RSP）", "廣度", ratio("spy", "rsp"), pol=1, digits=3, flat=0.002, tip="上升代表權值股走得比多數股票強"),
+        row("up_share", "台股：上市股票上漲家數占比", "廣度", upshare, unit="%", digits=1, pol=1, method="ma5", flat=1, tip="上漲÷（上漲＋下跌），看 5 日均方向"),
         row("vix", "VIX", "波動率", S("vix"), pol=-1, flat=0.2, tip="持續回落代表恐慌消退"),
         row("vix_term", "VIX÷VIX3M", "波動率", ratio("vix", "vix3m"), pol=-1, digits=3, flat=0.005, tip="大於 1 為近月恐慌高於遠月（倒掛）"),
         row("pc_total", "美股總 Put/Call", "Put/Call", take("cboe", "total"), method="ma5", flat=0.01, tip="Cboe；看 5 日均方向，單日雜訊多"),
