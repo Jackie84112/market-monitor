@@ -54,6 +54,23 @@
   .st{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
   .warn{color:#C02323;}
+  /* 每日訊號：點一列展開近 10 個交易日 */
+  tr.tg{cursor:pointer;}
+  tr.tg .name::before{content:"▸";display:inline-block;width:14px;color:var(--muted);font-size:11px;}
+  tr.tg.open .name::before{content:"▾";}
+  tr.tg .name small{padding-left:14px;}
+  tr.detail{display:none;}
+  tr.detail.open{display:table-row;}
+  tr.detail:hover{background:none;}
+  tr.detail>td{background:var(--soft);padding:10px 14px 12px;}
+  .dt-t{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  .dt{display:grid;grid-template-columns:64px repeat(var(--n),minmax(0,1fr));font-size:12.5px;font-variant-numeric:tabular-nums;}
+  .dt-plot{grid-column:2 / -1;min-width:0;}
+  .dt>div{padding:3px 0;text-align:center;white-space:nowrap;}
+  .dt>.dt-plot{padding:0;}
+  .dt>.h{text-align:left;color:var(--muted);font-size:12px;}
+  .dt>.d{color:var(--muted);font-size:12px;border-top:1px solid var(--line);}
+  .dt>.dt-gap{grid-column:1;padding:0;}
   @media (max-width:900px){.multi{grid-template-columns:repeat(2,1fr);} .two{grid-template-columns:1fr;}}
   @media (max-width:640px){
     .multi{grid-template-columns:1fr;}
@@ -70,6 +87,13 @@
     table.cards tr.grp td::before{content:none;}
     .spark{width:130px;}
     .rt{width:96px;}
+    table.cards tr.detail{display:none;padding:0;border:0;}
+    table.cards tr.detail.open{display:block;}
+    table.cards tr.detail>td{display:block;text-align:left;padding:8px 8px 10px;}
+    table.cards tr.detail>td::before{content:none;}
+    table.cards tr.tg td.name::before{content:"▸";}
+    table.cards tr.tg.open td.name::before{content:"▾";}
+    .dt{grid-template-columns:50px repeat(var(--n),minmax(0,1fr));font-size:11.5px;}
   }
 </style>
 </head>
@@ -105,6 +129,7 @@
       <p>[註1]：方向只描述近 5 個交易日的變化，不是買賣訊號，門檻尚未回測；好轉綠、惡化紅，上升、下降為好壞需配合其他指標判斷。</p>
       <p>[註2]：融資餘額證交所於晚間公布，且註明應以隔日報表的「前日餘額」為準；維持率依公布當日餘額計算。</p>
       <p>[註3]：美股沒有每日的三大法人資料，也沒有每日融資資料，所以籌碼只有台股。</p>
+      <p>[註4]：點任一列可展開近 10 個交易日的逐日數字（窄螢幕為近 5 日）；買賣超為柱狀圖，其餘為折線圖。5 日累計好轉不代表當日轉買，可能只是較早的大額賣超移出計算範圍。</p>
     </div>
   </section>
 
@@ -188,7 +213,7 @@ function line(el, s, o = {}) {
   svg.addEventListener("pointerleave", () => { ch.style.display = "none"; tip.style.display = "none"; });
 }
 
-function rowsHTML(rows) {
+function rowsHTML(rows, expand) {
   let html = "", grp = "";
   for (const r of rows) {
     if (r.group !== grp) { grp = r.group; html += `<tr class="grp"><td colspan="6">${grp}</td></tr>`; }
@@ -196,17 +221,62 @@ function rowsHTML(rows) {
     const d = r.digits ?? 2, m = r.method;
     const lab = m === "sum5" ? "5 日累計" : m === "ma5" ? "5 日均變化" : "5 日變化";
     const chip = r.dir === "好轉" ? "g" : r.dir === "惡化" ? "r" : "";
-    html += `<tr><td class="name">${esc(r.label)}<small>${r.tip || ""}</small></td>
+    html += `<tr${expand ? ` class="tg" tabindex="0" aria-expanded="false" data-k="${r.key}"` : ""}><td class="name">${esc(r.label)}<small>${r.tip || ""}</small></td>
       <td class="n" data-l="最新">${fmt(r.last, d)}${r.unit || ""}</td>
       <td class="n mu" data-l="資料日">${short(r.date)}</td>
       <td class="n" data-l="變化"><small>${lab}</small> ${sign(r.measure, d === 0 ? 0 : m === "sum5" ? d : Math.min(d + 1, 3))}</td>
       <td data-l="方向"><span class="chip ${chip}">${r.dir}</span></td>
       <td data-l="走勢"><div class="spark plot" data-k="${r.key}"></div></td></tr>`;
+    if (expand) html += `<tr class="detail" data-d="${r.key}"><td colspan="6"></td></tr>`;
   }
   return html;
 }
 
 const DAILY_SPARK_START = "2026-10-06";   // 每日訊號迷你圖起始日（換波段時與 build.py 的 PEAK_DATE 一起改）
+
+// 展開列：柱狀圖（買賣超）或折線圖（水位），X 軸與下方數字欄對齊
+function detailPlot(el, s, bars) {
+  const W = Math.max(el.clientWidth, 80), H = 96, T = 8, B = 8, n = s.length;
+  const v = s.map(p => p[1]);
+  let lo = Math.min(...v, ...(bars ? [0] : [])), hi = Math.max(...v, ...(bars ? [0] : []));
+  if (hi === lo) { hi += 1; lo -= 1; }
+  if (!bars) { const pad = (hi - lo) * .1; lo -= pad; hi += pad; }
+  const X = i => (i + .5) * W / n, Y = x => T + (H - T - B) * (1 - (x - lo) / (hi - lo));
+  let g = "";
+  if (bars) {
+    const bw = Math.min(W / n * .55, 30), z = Y(0);
+    g = v.map((x, i) => `<rect x="${(X(i) - bw / 2).toFixed(1)}" y="${Math.min(Y(x), z).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(Math.abs(Y(x) - z), 1).toFixed(1)}" rx="2" fill="${x >= 0 ? "var(--dn)" : "var(--up)"}"/>`).join("")
+      + `<line x1="0" x2="${W}" y1="${z}" y2="${z}" stroke="#8C9096" stroke-width="1"/>`;
+  } else {
+    const path = v.map((x, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(x).toFixed(1)).join("");
+    g = `<path d="${path}" fill="none" stroke="var(--chart)" stroke-width="2" stroke-linejoin="round"/>`
+      + v.map((x, i) => `<circle cx="${X(i).toFixed(1)}" cy="${Y(x).toFixed(1)}" r="${i === n - 1 ? 3.5 : 2.5}" fill="var(--chart)" stroke="#fff" stroke-width="1"/>`).join("");
+  }
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img">${g}</svg>`;
+}
+
+function drawDetail(tr) {
+  const r = DATA.rows.find(y => y.key === tr.dataset.d), td = tr.firstChild, m = r.method, d = r.digits ?? 2;
+  const all = r.series.map(p => p[1]);
+  const second = all.map((_, i) => {
+    if (m === "chg5") return i ? all[i] - all[i - 1] : null;
+    if (i < 4) return null;
+    const w = all.slice(i - 4, i + 1).reduce((a, b) => a + b, 0);
+    return m === "sum5" ? w : w / 5;
+  });
+  const n = innerWidth <= 640 ? 5 : 10, s = r.series.slice(-n), sec = second.slice(-n), bars = m === "sum5";
+  const lab2 = m === "sum5" ? "5 日累計" : m === "ma5" ? "5 日均" : "較前日";
+  const color = x => !bars || x === 0 ? "" : x > 0 ? "dn" : "up";
+  const unit = (r.unit || "").trim();
+  td.innerHTML = `<div class="dt-t">近 ${s.length} 個交易日${unit ? `，單位：${unit}` : ""}</div>
+    <div class="dt" style="--n:${s.length}">
+      <div class="dt-gap"></div><div class="dt-plot"></div>
+      <div class="h d">日期</div>${s.map(p => `<div class="d">${short(p[0])}</div>`).join("")}
+      <div class="h">${bars ? "當日" : "數值"}</div>${s.map(p => `<div class="${color(p[1])}">${bars ? sign(p[1], d) : fmt(p[1], d)}</div>`).join("")}
+      <div class="h">${lab2}</div>${sec.map(x => `<div class="${color(x)}">${m === "ma5" ? fmt(x, d) : sign(x, d)}</div>`).join("")}
+    </div>`;
+  detailPlot(td.querySelector(".dt-plot"), s, bars);
+}
 
 let DATA;
 function drawCharts() {
@@ -224,6 +294,7 @@ function drawCharts() {
     const o = DATA.overnight.find(y => y.key === el.dataset.k);
     if (o && o.line && o.line.length > 1) line(el, o.line, {h: 34, d: o.digits, levels: [{name: "", v: o.base}], name: o.name + "當晚走勢"});
   });
+  document.querySelectorAll("tr.detail.open").forEach(drawDetail);
 }
 
 Promise.all([fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json()),
@@ -254,7 +325,15 @@ Promise.all([fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json())
       <td class="mu" data-l="報價時間">${twTime(o.time)}</td><td class="mu" data-l="備註">${o.extra || "—"}</td></tr>`).join("");
 
   const A = ["廣度", "波動率", "Put/Call", "台股籌碼"];
-  $("a").innerHTML = rowsHTML(j.rows.filter(r => A.includes(r.group)));
+  $("a").innerHTML = rowsHTML(j.rows.filter(r => A.includes(r.group)), true);
+  const toggle = tr => {
+    const dt = tr.nextElementSibling, open = tr.classList.toggle("open");
+    dt.classList.toggle("open", open);
+    tr.setAttribute("aria-expanded", open);
+    if (open) drawDetail(dt);
+  };
+  $("a").addEventListener("click", e => { const tr = e.target.closest("tr.tg"); if (tr) toggle(tr); });
+  $("a").addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches("tr.tg")) { e.preventDefault(); toggle(e.target); } });
   $("b").innerHTML = rowsHTML(j.rows.filter(r => !A.includes(r.group)));
 
   $("fwdSub").textContent = `${man.forward.source}（${man.forward.asof.replace(/-/g, "/")}）`;
