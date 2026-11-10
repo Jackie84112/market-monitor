@@ -142,21 +142,6 @@
     </div>
   </section>
 
-  <section class="two">
-    <div class="card">
-      <div class="head"><h2>Forward P/E</h2><span id="fwdSub"></span></div>
-      <table><thead><tr><th>板塊</th><th class="n">目前</th><th class="n">5 年均</th><th class="n">10 年均</th><th class="n">對 10 年均</th></tr></thead><tbody id="fwd"></tbody></table>
-      <div class="notes"><p>[註1]：手動更新，FactSet 每週五出新版。估值決定空間、不決定時點；便宜的前提是 EPS 預估不被下修。</p></div>
-    </div>
-    <div class="card">
-      <div class="head"><h2>Trailing P/E</h2><span>近四季已實現盈餘，月底</span></div>
-      <table><thead><tr><th>指數</th><th class="n">資料月</th><th class="n">目前</th><th class="n">10 年均</th><th class="n">對 10 年均</th></tr></thead><tbody id="trl"></tbody></table>
-      <div class="notes">
-        <p>[註1]：手動更新；尚未反映 11 月的跌幅與第三季財報。</p>
-        <p>[註2]：經理人現金與曝險尚未納入：NAAIM 已改訂閱制、BofA 調查需付費。</p>
-      </div>
-    </div>
-  </section>
 </div>
 <div id="tip"></div>
 
@@ -297,8 +282,7 @@ function drawCharts() {
   document.querySelectorAll("tr.detail.open").forEach(drawDetail);
 }
 
-Promise.all([fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json()),
-             fetch("data/manual.json", {cache: "no-store"}).then(r => r.json())]).then(([j, man]) => {
+fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json()).then(j => {
   DATA = j;
   $("sub").textContent = `S&P 500／Nasdaq-100／SOX／道瓊／0050／KOSPI　｜　資料更新：${j.updated}（台灣時間）`;
   $("st").innerHTML = Object.entries(j.status).map(([k, v]) =>
@@ -335,13 +319,6 @@ Promise.all([fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json())
   $("a").addEventListener("click", e => { const tr = e.target.closest("tr.tg"); if (tr) toggle(tr); });
   $("a").addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches("tr.tg")) { e.preventDefault(); toggle(e.target); } });
   $("b").innerHTML = rowsHTML(j.rows.filter(r => !A.includes(r.group)));
-
-  $("fwdSub").textContent = `${man.forward.source}（${man.forward.asof.replace(/-/g, "/")}）`;
-  const rel = (a, b) => b ? (a / b - 1) * 100 : null;
-  $("fwd").innerHTML = man.forward.rows.map(r => { const v = rel(r.pe, r.avg10);
-    return `<tr${r.total ? ' style="font-weight:500"' : ""}><td>${esc(r.name)}</td><td class="n">${fmt(r.pe, 1)}</td><td class="n mu">${fmt(r.avg5, 1)}</td><td class="n mu">${fmt(r.avg10, 1)}</td><td class="n ${cls(v)}">${sign(v, 1, "%")}</td></tr>`; }).join("");
-  $("trl").innerHTML = man.trailing.rows.map(r => { const v = rel(r.pe, r.avg10);
-    return `<tr><td>${esc(r.name)}</td><td class="n mu">${r.month}</td><td class="n">${fmt(r.pe, 2)}</td><td class="n mu">${fmt(r.avg10, 2)}</td><td class="n ${v == null ? "mu" : cls(v)}">${sign(v, 1, "%")}</td></tr>`; }).join("");
 
   drawCharts();
   let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(drawCharts, 150); });
