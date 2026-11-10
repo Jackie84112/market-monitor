@@ -20,6 +20,7 @@ import requests
 
 ROOT = Path(__file__).resolve().parent.parent
 OUT, STORE = ROOT / "data" / "monitor.json", ROOT / "data" / "store.json"
+PC_HIST = ROOT / "data" / "pc_history.json"   # Put/Call 長歷史（2024/3 起），供事件對照算百分位
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"}
 TW = dt.timezone(dt.timedelta(hours=8))
 TWSE_DELAY = 1.5   # 證交所限流，勿低於 1.4 秒
@@ -27,6 +28,11 @@ KEEP = 180         # 每條序列保留的筆數
 PEAK_DATE = "2026-10-06"    # 回補關卡統一起算的高點日（換波段時手動改）
 CHART_START = "2026-06-01"  # 指數走勢圖起始日
 RETRACE = (0.382, 0.5, 0.618)
+# Put/Call 事件對照：最後一個是本次（頁面以強調色畫），新增事件往後加
+PC_EVENTS = [("川普關稅", "2025-04-08"), ("Burry 放空", "2025-11-20"), ("美伊戰爭", "2026-03-30"),
+             ("去槓桿", "2026-07-29"), ("CDS＋民主黨勝選", "2026-11-05")]
+PC_WIN = (-5, 10)   # 事件日前 5、後 10 個交易日
+PC_LOOKBACK = 252   # 百分位：與前 252 個交易日（約一年）比
 
 INDICES = [("spx", "S&P 500", "^GSPC"), ("ndx", "Nasdaq-100", "^NDX"), ("sox", "費城半導體 SOX", "^SOX"),
            ("dji", "道瓊工業", "^DJI"), ("t0050", "元大台灣 50（0050）", "0050.TW"), ("kospi", "韓國 KOSPI", "^KS11")]
@@ -250,6 +256,40 @@ def taifex_range(start, end):
     return pc, txf
 
 
+def pc_events(store):
+    """把 store 新抓到的 Cboe／期交所 P/C 併入長歷史，算各事件前後每天在前一年的百分位。"""
+    import bisect
+    hist = json.loads(PC_HIST.read_text(encoding="utf-8")) if PC_HIST.exists() else {"cboe": {}, "taifex": {}}
+    for src, ks in (("cboe", ("total", "equity", "index")), ("taifex", ("vol", "oi"))):
+        for d, v in store.get(src, {}).items():
+            got = {k: v[k] for k in ks if v.get(k) is not None}
+            if got:
+                hist[src].setdefault(d, {}).update(got)
+        hist[src] = dict(sorted(hist[src].items()))
+    PC_HIST.write_text(json.dumps(hist, separators=(",", ":")), encoding="utf-8")
+    out = {}
+    for key, src, k in (("pc_total", "cboe", "total"), ("pc_equity", "cboe", "equity"), ("pc_index", "cboe", "index"),
+                        ("pc_tw_oi", "taifex", "oi"), ("pc_tw_vol", "taifex", "vol")):
+        ds = [d for d, v in hist[src].items() if v.get(k) is not None]
+        vs = [hist[src][d][k] for d in ds]
+        evs = []
+        for i_ev, (name, date) in enumerate(PC_EVENTS):
+            e = bisect.bisect_right(ds, date) - 1   # 事件日當天，休市則取前一個交易日
+            if e < 0:
+                continue
+            pts = []
+            for off in range(PC_WIN[0], PC_WIN[1] + 1):
+                i = e + off
+                if i < PC_LOOKBACK or i >= len(ds):
+                    continue
+                prev = vs[i - PC_LOOKBACK:i]
+                pts.append([off, round(100 * sum(p <= vs[i] for p in prev) / len(prev)), vs[i], ds[i]])
+            if pts:
+                evs.append({"name": name, "date": ds[e], "current": i_ev == len(PC_EVENTS) - 1, "pts": pts})
+        out[key] = evs
+    return out
+
+
 def update_store(backfill):
     store = json.loads(STORE.read_text(encoding="utf-8")) if STORE.exists() else {"cboe": {}, "twse": {}, "taifex": {}}
     today = dt.datetime.now(TW).date()
@@ -450,9 +490,15 @@ def main():
         if S(k):
             indices.append({"key": k, "name": n, "sym": sym, "series": [[d, round(v, 2)] for d, v in S(k) if d >= CHART_START], **index_position(S(k), bool(live.get(k)))})
 
+    try:
+        pcev = pc_events(store)
+    except Exception as e:
+        pcev = old.get("pcEvents", {})
+        print("ERR pc_events", e)
     now = dt.datetime.now(TW)
     OUT.write_text(json.dumps({"updated": now.strftime("%Y/%m/%d %H:%M"), "status": status, "indices": indices, "overnight": overnight,
-                               "rows": rows, "series": series, "live": live, "mtime": mtime}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
+                               "rows": rows, "series": series, "live": live, "mtime": mtime,
+                               "pcEvents": pcev}, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     print(now, {k: (v["ok"], v["asof"]) for k, v in status.items()})
     for k, v in status.items():
         if v["err"]:
