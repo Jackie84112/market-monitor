@@ -19,9 +19,10 @@
   h1{font-size:28px;margin:0;letter-spacing:.5px;}
   .sub{color:var(--muted);font-size:13px;margin:4px 0 0;}
   .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0;}
-  .head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 12px;margin-bottom:10px;}
-  .head h2{font-size:17px;font-weight:500;margin:0;letter-spacing:.3px;}
-  .head span{color:var(--muted);font-size:12.5px;}
+  .head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid var(--line);}
+  .head h2{font-size:23px;font-weight:700;margin:0;letter-spacing:.5px;padding-left:12px;border-left:4px solid var(--accent);line-height:1.15;}
+  .head span{color:var(--muted);font-size:13.5px;}
+  @media (max-width:640px){.head h2{font-size:20px;} .head span{font-size:12.5px;}}
   table{width:100%;border-collapse:collapse;font-size:13.5px;line-height:1.5;font-variant-numeric:tabular-nums;}
   th{font-size:12px;font-weight:400;color:var(--muted);letter-spacing:.5px;text-align:left;padding:6px 10px;border-bottom:1px solid var(--ink);white-space:nowrap;}
   td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
