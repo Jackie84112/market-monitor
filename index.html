@@ -35,6 +35,7 @@
   small{font-size:12px;color:var(--muted);}
   .name small{display:block;line-height:1.35;margin-top:1px;}
   .grp td{background:#EFEDE7;font-size:19px;color:var(--ink);letter-spacing:.5px;padding:9px 10px;font-weight:700;}
+  .grp td small{display:block;font-size:12.5px;font-weight:400;letter-spacing:0;margin-top:3px;line-height:1.5;}
   #a td.name,#b td.name{font-size:15px;font-weight:500;}
   #a td.name small,#b td.name small{font-weight:400;}
   .chip{display:inline-block;font-size:12px;line-height:1.6;padding:0 8px;border-radius:5px;background:#EFEEEA;color:#4B5158;white-space:nowrap;}
@@ -201,10 +202,11 @@ function line(el, s, o = {}) {
   svg.addEventListener("pointerleave", () => { ch.style.display = "none"; tip.style.display = "none"; });
 }
 
+const GROUP_NOTE = {"Put/Call": "Cboe 是芝加哥期權交易所（Chicago Board Options Exchange），美國最大的選擇權交易所，每天收盤後會公布旗下交易所的 Put/Call 比率，是市場最常引用的版本。"};
 function rowsHTML(rows, expand) {
   let html = "", grp = "";
   for (const r of rows) {
-    if (r.group !== grp) { grp = r.group; html += `<tr class="grp"><td colspan="6">${grp}</td></tr>`; }
+    if (r.group !== grp) { grp = r.group; html += `<tr class="grp"><td colspan="6">${grp}${GROUP_NOTE[grp] ? `<small>${GROUP_NOTE[grp]}</small>` : ""}</td></tr>`; }
     if (r.empty) { html += `<tr><td class="name">${r.label}<small>${r.tip || ""}</small></td><td colspan="5" class="mu">尚無資料</td></tr>`; continue; }
     const d = r.digits ?? 2, m = r.method;
     const lab = m === "sum5" ? "5 日累計" : m === "ma5" ? "5 日均變化" : "5 日變化";
