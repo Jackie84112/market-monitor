@@ -69,8 +69,6 @@
   tr.detail:hover{background:none;}
   tr.detail>td{background:var(--soft);padding:10px 14px 12px;}
   .dt-t{font-size:12px;color:var(--muted);margin-bottom:6px;}
-  .ev-lg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin:6px 0 4px;}
-  .ev-lg i{display:inline-block;width:14px;height:3px;border-radius:2px;vertical-align:middle;margin-right:5px;}
   .ev-tb{width:100%;font-size:12.5px;margin-top:6px;}
   .ev-tb td,.ev-tb th{padding:4px 8px;border-bottom:1px solid var(--line);}
   .ev-tb tr:last-child td{border-bottom:0;}
@@ -263,50 +261,16 @@ function detailPlot(el, s, bars) {
   el.innerHTML = `<svg width="${W}" height="${H}" role="img">${g}</svg>`;
 }
 
-// Put/Call 展開列：各事件前後每天在前一年的百分位疊圖（0＝事件日）
-const EV_COLORS = ["#7C8DB5", "#C29A5B", "#6FA585", "#B07AA1"];
+// Put/Call 展開列：各事件前後在前一年的百分位摘要表
 function drawEvents(td, r, evs) {
   const d = r.digits ?? 2, u = r.unit || "";
-  const col = (e, i) => e.current ? "var(--accent)" : EV_COLORS[i % EV_COLORS.length];
-  td.innerHTML = `<div class="dt-t">事件對照：每天的數值在前一年（252 個交易日）排第幾百分位，100＝一年最高、0＝一年最低；橫軸 0＝事件日</div>
-    <div class="ev-plot"></div>
-    <div class="ev-lg">${evs.map((e, i) => `<span><i style="background:${col(e, i)};${e.current ? "height:4px" : ""}"></i>${esc(e.name)}（${e.date.replace(/-/g, "/")}）</span>`).join("")}</div>
-    <table class="ev-tb"><thead><tr><th>事件</th><th class="n">事件日數值</th><th class="n">事件日百分位</th><th class="n">期間最高百分位</th><th class="n">最新／期末百分位</th></tr></thead><tbody>${evs.map((e, i) => {
+  td.innerHTML = `<div class="dt-t">事件對照：百分位＝當天數值在前一年（252 個交易日）排第幾，100＝一年最高、0＝一年最低；期間＝事件日前 5 至後 10 個交易日</div>
+    <table class="ev-tb"><thead><tr><th>事件</th><th>日期</th><th class="n">事件日數值</th><th class="n">事件日百分位</th><th class="n">期間最高百分位</th><th class="n">最新／期末百分位</th></tr></thead><tbody>${evs.map(e => {
       const z = e.pts.find(p => p[0] === 0), hi = e.pts.reduce((a, b) => b[1] > a[1] ? b : a), last = e.pts[e.pts.length - 1];
-      return `<tr${e.current ? ' style="font-weight:500"' : ""}><td><i style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${col(e, i)};margin-right:6px"></i>${esc(e.name)}</td>
+      return `<tr${e.current ? ' style="font-weight:500"' : ""}><td>${esc(e.name)}</td><td class="mu">${e.date.replace(/-/g, "/")}</td>
         <td class="n">${z ? fmt(z[2], d) + u : "—"}</td><td class="n">${z ? z[1] : "—"}</td>
         <td class="n">${hi[1]} <small>${short(hi[3])}</small></td><td class="n">${last[1]} <small>${last[0] >= 0 ? "+" : ""}${last[0]} 日</small></td></tr>`;
     }).join("")}</tbody></table>`;
-  const el = td.querySelector(".ev-plot");
-  const W = Math.max(el.clientWidth, 200), H = 200, L = 30, R = 10, T = 8, B = 22, x0 = -5, x1 = 10;
-  const X = o => L + (W - L - R) * (o - x0) / (x1 - x0), Y = v => T + (H - T - B) * (1 - v / 100);
-  let g = `<rect x="${L}" y="${Y(100)}" width="${W - L - R}" height="${Y(95) - Y(100)}" fill="#DC2626" opacity=".08"/>
-    <rect x="${L}" y="${Y(5)}" width="${W - L - R}" height="${Y(0) - Y(5)}" fill="#DC2626" opacity=".08"/>`;
-  [0, 50, 100].forEach(v => g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="${v === 50 ? "#B9BDC2" : "#E4E2DC"}" stroke-width="1"${v === 50 ? ' stroke-dasharray="3 3"' : ""}/>
-    <text x="${L - 5}" y="${Y(v) + 3.5}" font-size="10.5" fill="#6B7178" text-anchor="end">${v}</text>`);
-  g += `<line x1="${X(0)}" x2="${X(0)}" y1="${T}" y2="${H - B}" stroke="#8C9096" stroke-width="1" stroke-dasharray="2 3"/>`;
-  [-5, 0, 5, 10].forEach(o => g += `<text x="${X(o)}" y="${H - 6}" font-size="10.5" fill="#6B7178" text-anchor="middle">${o === 0 ? "事件日" : (o > 0 ? "+" : "") + o}</text>`);
-  evs.forEach((e, i) => {
-    const path = e.pts.map((p, k) => (k ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join("");
-    g += `<path d="${path}" fill="none" stroke="${col(e, i)}" stroke-width="${e.current ? 3 : 1.6}" stroke-linejoin="round" opacity="${e.current ? 1 : .85}"/>`;
-    if (e.current) { const p = e.pts[e.pts.length - 1]; g += `<circle cx="${X(p[0])}" cy="${Y(p[1])}" r="4" fill="var(--accent)" stroke="#fff" stroke-width="1.5"/>`; }
-  });
-  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="${esc(r.label)} 事件對照">${g}
-    <line class="ch" y1="${T}" y2="${H - B}" stroke="#8C9096" stroke-width="1" style="display:none"/><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
-  const svg = el.firstChild, ch = svg.querySelector(".ch");
-  svg.addEventListener("pointermove", ev => {
-    const b = svg.getBoundingClientRect(), o = Math.max(x0, Math.min(x1, Math.round(x0 + (ev.clientX - b.left - L) / (W - L - R) * (x1 - x0))));
-    ch.setAttribute("x1", X(o)); ch.setAttribute("x2", X(o)); ch.style.display = "";
-    tip.innerHTML = `<b>${o === 0 ? "事件日" : (o > 0 ? "+" : "") + o + " 日"}</b>` + evs.map((e, i) => {
-      const p = e.pts.find(q => q[0] === o);
-      return p ? `<br><span style="color:${col(e, i)}">■</span> ${esc(e.name)}　${short(p[3])}　${fmt(p[2], d)}${u}　<b>第 ${p[1]}</b>` : "";
-    }).join("");
-    tip.style.display = "block";
-    const tw = tip.offsetWidth;
-    tip.style.left = Math.max(6, Math.min(innerWidth - tw - 6, ev.clientX + 12)) + "px";
-    tip.style.top = Math.max(6, ev.clientY - tip.offsetHeight - 10) + "px";
-  });
-  svg.addEventListener("pointerleave", () => { ch.style.display = "none"; tip.style.display = "none"; });
 }
 
 function drawDetail(tr) {
