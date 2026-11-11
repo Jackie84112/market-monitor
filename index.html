@@ -319,7 +319,7 @@ function drawCharts() {
 
 fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json()).then(j => {
   DATA = j;
-  $("sub").textContent = `S&P 500／Nasdaq-100／SOX／道瓊／0050／KOSPI　｜　資料更新：${j.updated}（台灣時間）`;
+  $("sub").textContent = `S&P 500／Nasdaq-100／SOX／0050／KOSPI／道瓊　｜　資料更新：${j.updated}（台灣時間）`;
   $("st").innerHTML = Object.entries(j.status).map(([k, v]) =>
     `<span class="chip ${v.ok ? "" : "r"}" title="${v.err ? esc(v.err) : ""}">${k} ${v.ok ? "至" : "抓取失敗，沿用至"} ${short(v.asof)}</span>`).join("");
 
