@@ -67,11 +67,27 @@ def yahoo(sym, adjusted=False):
     q = j["indicators"]["quote"][0]["close"]
     adj = (j["indicators"].get("adjclose") or [{}])[0].get("adjclose") or [None] * len(q)
     off = m.get("gmtoffset", 0)
-    out = {}
-    for t, c, a in zip(j["timestamp"], q, adj):
+    out, holes = {}, []
+    day = lambda t: dt.datetime.fromtimestamp(t + off, dt.timezone.utc).strftime("%Y-%m-%d")
+    for i, (t, c, a) in enumerate(zip(j["timestamp"], q, adj)):
         v = a if adjusted and a is not None else c
         if v is not None:
-            out[dt.datetime.fromtimestamp(t + off, dt.timezone.utc).strftime("%Y-%m-%d")] = v
+            out[day(t)] = v
+        elif sym.endswith(".TW") and i < len(q) - 1:
+            holes.append(i)
+    # Yahoo 台股日線偶有收盤 null（如 0050 2026-11-10），用證交所 STOCK_DAY 官方收盤補；還原價用下一筆的 adj/close 比例換算
+    for i in holes:
+        try:
+            d = day(j["timestamp"][i])
+            v = twse_close(sym[:-3], d)
+            if v is None:
+                continue
+            if adjusted:
+                k = next(k for k in range(i + 1, len(q)) if q[k] and adj[k])
+                v *= adj[k] / q[k]
+            out[d] = v
+        except Exception:
+            pass
     rows = [[d, v] for d, v in sorted(out.items())]
     per, now = (m.get("currentTradingPeriod") or {}).get("regular") or {}, time.time()
     live = bool(per) and per["start"] <= now < per["end"] and rows[-1][0] == dt.datetime.fromtimestamp(now + off, dt.timezone.utc).strftime("%Y-%m-%d")
@@ -166,6 +182,15 @@ def twse(path, **params):
     time.sleep(TWSE_DELAY)
     r.raise_for_status()
     return r.json()
+
+
+def twse_close(stock, iso):
+    """證交所個股/ETF 單日收盤（STOCK_DAY 回傳整月，民國日期）。"""
+    j = twse("afterTrading/STOCK_DAY", date=iso.replace("-", ""), stockNo=stock)
+    y, m, d = iso.split("-")
+    key = f"{int(y) - 1911}/{m}/{d}"
+    row = next((r for r in j.get("data") or [] if r[0] == key), None)
+    return num(row[6]) if row else None
 
 
 def twse_flows(ymd):
