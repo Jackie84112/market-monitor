@@ -88,13 +88,13 @@
   </section>
 
   <section class="card">
-    <div class="head"><h2>回補走勢</h2><span>以低點為原點，之後每日收盤；點折線上的點可標出該日的回補水位</span></div>
+    <div class="head"><h2>回補走勢</h2><span>以低點為原點，之後每日收盤；滑鼠移到點上，顯示該日的回補水位</span></div>
     <div id="rchart" style="width:100%"></div>
     <div class="legend" id="rlegend"></div>
     <div class="notes">
       <p>[註1]：原點是低點日的盤中最低價（不是收盤價），之後每個點是當日收盤價；縱軸涵蓋整個 100% 回補區間：0% ＝ 低點，100% ＝ 高點。</p>
       <p>[註2]：回補水位 ＝（價格 − 低點）÷（高點 − 低點）；38.2%、50%、61.8% 是常用的回檔比例，不具預測力。</p>
-      <p>[註3]：橫軸只放交易日（不含休市日），圖右側留白給之後的交易日；點折線上的點標出回補水位，再點一次取消。</p>
+      <p>[註3]：橫軸只放交易日（不含休市日），圖右側留白給之後的交易日；滑鼠移到折線上的點，會出現虛線標出該日回補水位，浮標只顯示當天收盤價（觸控螢幕點一下）。</p>
     </div>
   </section>
 
@@ -266,8 +266,7 @@ function drawChart() {
     `<span><i style="background:#DC2626;opacity:.6"></i>壓力</span><span><i style="background:#15803D;opacity:.6"></i>支撐</span><span>K 線：紅漲綠跌</span>`;
 }
 
-// 回補走勢：原點＝低點日最低價，Y 軸涵蓋 0%（低點）到 100%（高點），點折線上的點標出回補水位
-const PINS = new Set();
+// 回補走勢：原點＝低點日最低價，Y 軸涵蓋 0%（低點）到 100%（高點）；滑鼠移到點上自動標出該日回補水位（虛線）與只有股價的浮標
 function drawRetrace() {
   const el = $("rchart"), sw = A.swing, lo = sw.low.v, hi = sw.high.v, span = hi - lo;
   const pts = [[sw.low.date, lo], ...(sw.path || [])], n = pts.length;
@@ -309,47 +308,30 @@ function drawRetrace() {
       ? `<circle cx="${X(0)}" cy="${Y(p[1])}" r="5" fill="#fff" stroke="var(--chart)" stroke-width="2"/>`
       : `<circle cx="${X(i)}" cy="${Y(p[1])}" r="${i === n - 1 ? 5.5 : 4}" fill="var(--chart)" stroke="#fff" stroke-width="1.5"/>`;
   });
-  const lastP = pts[n - 1];
   g += `<text x="${X(0) + 9}" y="${Y(lo) - 9}" font-size="11" fill="#22262B">原點：${short(sw.low.date)} 最低 ${fmt(lo)}</text>`;
-  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="AMD 回補走勢圖">${g}<g id="rpins"></g><g id="rhov"></g><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
-  const svg = el.firstChild, pins = svg.querySelector("#rpins"), hov = svg.querySelector("#rhov");
-  const drawPins = () => {
-    // 最新一點的數字標籤（被標記時改由標記線顯示，避免文字疊在一起）
-    const lastLab = n > 1 && !PINS.has(lastP[0])
-      ? `<text x="${X(n - 1)}" y="${Y(lastP[1]) - 11}" font-size="11.5" fill="#22262B" font-weight="600" text-anchor="${n - 1 > slots - 3 ? "end" : "middle"}" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${fmt(lastP[1])}｜${fmt(pc(lastP[1]), 1)}%</text>` : "";
-    pins.innerHTML = lastLab + [...PINS].map(d => pts.findIndex(p => p[0] === d)).filter(i => i >= 0).map(i => {
-      const y = Y(pts[i][1]), txt = narrow ? `回補 ${fmt(pc(pts[i][1]), 1)}%` : `${short(pts[i][0])} 收 ${fmt(pts[i][1])}｜回補 ${fmt(pc(pts[i][1]), 1)}%`;
-      return `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="${ACC}" stroke-width="1.5" stroke-dasharray="3 3"/>
-        <circle cx="${X(i)}" cy="${y}" r="7" fill="none" stroke="${ACC}" stroke-width="2"/>
-        <text x="${W - R - 6}" y="${y - 7}" font-size="11.5" font-weight="600" fill="${ACC}" text-anchor="end" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${txt}</text>`;
-    }).join("");
-    $("rlegend").innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span><span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>點選標記的回補位</span>` +
-      (PINS.size ? `<span class="chip" id="rclear" style="cursor:pointer">清除標記</span>` : `<span>點折線上的點，標出該日回補水位</span>`);
-    const c = $("rclear"); if (c) c.onclick = () => { PINS.clear(); drawPins(); };
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="AMD 回補走勢圖">${g}<g id="rhov"></g><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
+  const svg = el.firstChild, hov = svg.querySelector("#rhov");
+  // 滑鼠移到點上：該日回補水位的虛線＋浮標（浮標只有股價）
+  const show = i => {
+    const v = pts[i][1], x = X(i), y = Y(v), txt = fmt(v), w = txt.length * 7.6 + 18, h = 24;
+    const bx = Math.max(L + 2, Math.min(W - R - w - 2, x - w / 2)), by = y - 16 - h >= T ? y - 16 - h : y + 16;
+    hov.innerHTML = `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="${ACC}" stroke-width="1.5" stroke-dasharray="3 3"/>
+      <circle cx="${x}" cy="${y}" r="7" fill="none" stroke="${ACC}" stroke-width="2"/>
+      <text x="${x > (L + W - R) / 2 ? L + 8 : W - R - 6}" y="${y - 7}" font-size="11.5" font-weight="600" fill="${ACC}" text-anchor="${x > (L + W - R) / 2 ? "start" : "end"}" style="paint-order:stroke;stroke:#fff;stroke-width:3px">回補 ${fmt(pc(v), 1)}%</text>
+      <g><rect x="${bx}" y="${by}" width="${w}" height="${h}" rx="6" fill="#22262B"/><text x="${bx + w / 2}" y="${by + 16.5}" font-size="13" font-weight="600" fill="#fff" text-anchor="middle">${txt}</text></g>`;
   };
   const near = e => {
-    const r = svg.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
-    const i = Math.round((x - L) / pw);
-    if (i < 0 || i > n - 1) return -1;
-    return Math.hypot(x - X(i), y - Y(pts[i][1])) <= 22 ? i : -1;
+    const r = svg.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, i = Math.round((x - L) / pw);
+    return i >= 0 && i <= n - 1 && Math.hypot(x - X(i), y - Y(pts[i][1])) <= 18 ? i : -1;
   };
   svg.addEventListener("pointermove", e => {
     const i = near(e);
     svg.style.cursor = i >= 0 ? "pointer" : "default";
-    if (i < 0) { hov.innerHTML = ""; tip.style.display = "none"; return; }
-    const p = pts[i], pr = pc(p[1]);
-    hov.innerHTML = `<circle cx="${X(i)}" cy="${Y(p[1])}" r="8" fill="none" stroke="var(--chart)" stroke-width="2" opacity=".6"/>`;
-    showTip(e, `${p[0].replace(/-/g, "/")}${i ? " 收盤" : " 最低"} <b>${fmt(p[1])}</b><br>回補水位 <b>${fmt(pr, 1)}%</b>${i && PINS.has(p[0]) ? "（已標記）" : ""}<br>${i ? "點一下標出／取消回補水位" : "原點（0%）"}`);
+    if (i >= 0) show(i); else hov.innerHTML = "";
   });
-  svg.addEventListener("pointerleave", () => { hov.innerHTML = ""; tip.style.display = "none"; });
-  svg.addEventListener("click", e => {
-    const i = near(e);
-    if (i < 1) return;
-    const d = pts[i][0];
-    PINS.has(d) ? PINS.delete(d) : PINS.add(d);
-    drawPins();
-  });
-  drawPins();
+  svg.addEventListener("pointerdown", e => { const i = near(e); if (i >= 0) show(i); else hov.innerHTML = ""; });   // 觸控螢幕：點一下顯示
+  svg.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") hov.innerHTML = ""; });
+  $("rlegend").innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span><span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>`;
 }
 
 function drawMacd() {
