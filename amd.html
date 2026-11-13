@@ -274,7 +274,7 @@ function drawRetrace() {
   const chgs = [sw.lowChg, ...path0.map(p => p[3])];
   const W = Math.max(el.clientWidth, 280), narrow = W < 560;
   const L = 54, R = narrow ? 94 : 132, T = 16, PH = narrow ? 270 : 340, DH = 34, VG = 8, VH = vols ? (narrow ? 78 : 92) : 0;
-  const mac = sw.macd && sw.macd.length === n ? sw.macd : null, MG = 16, MH = mac ? (narrow ? 96 : 116) : 0;
+  const mac = sw.macd && sw.macd.length === n ? sw.macd : null, MG = 16, MH = mac ? (narrow ? 170 : 230) : 0;
   const VT = T + PH + DH + VG, MT = VT + (vols ? VH : 0) + MG, H = (mac ? MT + MH : vols ? VT + VH : T + PH + DH) + 8, bottom = T + PH;
   const slots = Math.max(n, 8), pw = (W - L - R) / (slots - 1);
   const X = i => L + pw * i, Y = v => T + PH * (1 - (v - lo) / span), pc = v => (v - lo) / span * 100;
@@ -327,19 +327,33 @@ function drawRetrace() {
   }
   // MACD（12,26,9）：柱狀圖＝柱（紅正綠負）、MACD 線（藍）、信號線（橘），與上方的點對齊
   if (mac) {
-    const mTop = MT + 16, mBot = MT + MH, mid = (mTop + mBot) / 2, mm = Math.max(...mac.flatMap(m => [Math.abs(m[1]), Math.abs(m[2]), Math.abs(m[3])])) * 1.25 || 1;
-    const MY = v => mid - v / mm * (mBot - mTop) / 2, mp = k => mac.map((m, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + MY(m[k]).toFixed(1)).join("");
+    // 縱軸只涵蓋實際數值（含 0），不再對稱於 0，區間才會拉得開；柱、線共用同一把尺
+    const all = mac.flatMap(m => [m[1], m[2], m[3]]).concat(0), mn = Math.min(...all), mx = Math.max(...all), pad = (mx - mn) * .14 || 1;
+    const mTop = MT + 18, mBot = MT + MH - 4, lo2 = mn - pad, hi2 = mx + pad;
+    const MY = v => mBot - (v - lo2) / (hi2 - lo2) * (mBot - mTop), mid = MY(0), mp = k => mac.map((m, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + MY(m[k]).toFixed(1)).join("");
     g += `<text x="${W - R}" y="${MT + 8}" font-size="10" fill="#9AA0A6" text-anchor="end">MACD（12, 26, 9）</text>
+      <line x1="${L}" x2="${L}" y1="${mTop}" y2="${mBot}" stroke="#8C9096" stroke-width="1"/>
       <line x1="${L}" x2="${W - R}" y1="${mid}" y2="${mid}" stroke="#8C9096" stroke-width="1"/>
-      <text x="${W - R + 6}" y="${mid + 3.5}" font-size="10.5" fill="#9AA0A6">0</text>`;
+      <text x="${W - R + 6}" y="${mid + 3.5}" font-size="10.5" fill="#9AA0A6">0</text>
+      <text x="${L - 6}" y="${MY(mx) + 3.5}" font-size="10.5" fill="#9AA0A6" text-anchor="end">${fmt(mx, dec)}</text>
+      <text x="${L - 6}" y="${MY(mn) + 3.5}" font-size="10.5" fill="#9AA0A6" text-anchor="end">${fmt(mn, dec)}</text>`;
     mac.forEach((m, i) => {
       const y = MY(m[3]), h = Math.max(1, Math.abs(y - mid)), up = m[3] >= 0;
-      g += `<rect x="${(X(i) - vbw / 2).toFixed(1)}" y="${(up ? y : mid).toFixed(1)}" width="${vbw.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${up ? "var(--up)" : "var(--dn)"}" opacity=".55"/>
+      g += `<rect x="${(X(i) - vbw / 2).toFixed(1)}" y="${(up ? y : mid).toFixed(1)}" width="${vbw.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${up ? "var(--up)" : "var(--dn)"}" opacity=".5"/>
         <text x="${X(i)}" y="${up ? y - 4 : y + h + 11}" font-size="10" fill="#4B5158" text-anchor="middle">${fmt(m[3], dec)}</text>`;
     });
-    g += `<path d="${mp(1)}" fill="none" stroke="var(--chart)" stroke-width="1.8" stroke-linejoin="round"/><path d="${mp(2)}" fill="none" stroke="#F59E0B" stroke-width="1.8" stroke-linejoin="round"/>`;
-    const last = mac[n - 1];
-    g += `<text x="${W - R + 6}" y="${MY(last[1]) + 3.5}" font-size="10.5" fill="var(--chart)">MACD　${fmt(last[1], dec)}</text><text x="${W - R + 6}" y="${MY(last[2]) + (Math.abs(MY(last[1]) - MY(last[2])) < 13 ? (last[2] < last[1] ? 14 : -6) : 3.5)}" font-size="10.5" fill="#D97706">信號　${fmt(last[2], dec)}</text>`;
+    g += `<path d="${mp(1)}" fill="none" stroke="var(--chart)" stroke-width="2.2" stroke-linejoin="round"/><path d="${mp(2)}" fill="none" stroke="#F59E0B" stroke-width="2.2" stroke-linejoin="round"/>`;
+    mac.forEach((m, i) => { g += `<circle cx="${X(i)}" cy="${MY(m[1])}" r="3.5" fill="var(--chart)" stroke="#fff" stroke-width="1.2"/><circle cx="${X(i)}" cy="${MY(m[2])}" r="3.5" fill="#F59E0B" stroke="#fff" stroke-width="1.2"/>`; });
+    // 交叉：柱子由負轉正＝黃金交叉、由正轉負＝死亡交叉（MACD 線穿越信號線），標在轉折那天
+    mac.forEach((m, i) => {
+      if (!i || (m[3] >= 0) === (mac[i - 1][3] >= 0)) return;
+      const gold = m[3] >= 0, cx = (X(i) + X(i - 1)) / 2, ratio = Math.abs(mac[i - 1][3]) / (Math.abs(mac[i - 1][3]) + Math.abs(m[3])), cy = MY(mac[i - 1][1] + (m[1] - mac[i - 1][1]) * ratio);
+      const px = X(i - 1) + (X(i) - X(i - 1)) * ratio, col = gold ? "var(--up)" : "var(--dn)";
+      g += `<circle cx="${px}" cy="${cy}" r="8" fill="none" stroke="${col}" stroke-width="2"/>
+        <text x="${px}" y="${cy - 13}" font-size="11.5" font-weight="700" fill="${col}" text-anchor="middle" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${gold ? "黃金交叉" : "死亡交叉"}</text>`;
+    });
+    const last = mac[n - 1], yl = MY(last[1]), ys = MY(last[2]);
+    g += `<text x="${W - R + 6}" y="${yl + (Math.abs(yl - ys) < 13 ? (last[1] > last[2] ? -4 : 12) : 3.5)}" font-size="10.5" fill="var(--chart)">MACD　${fmt(last[1], dec)}</text><text x="${W - R + 6}" y="${ys + (Math.abs(yl - ys) < 13 ? (last[1] > last[2] ? 12 : -4) : 3.5)}" font-size="10.5" fill="#D97706">信號　${fmt(last[2], dec)}</text>`;
   }
   el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="AMD 回補走勢圖與每日成交量">${g}<g id="rhov"></g><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
   const svg = el.firstChild, hov = svg.querySelector("#rhov");
