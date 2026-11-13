@@ -65,6 +65,8 @@
   tr.tg .name::before{content:"▸";display:inline-block;width:14px;color:var(--muted);font-size:11px;}
   tr.tg.open .name::before{content:"▾";}
   tr.tg .name small{padding-left:14px;}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin:8px 0 0;}
+  .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle;}
   tr.detail{display:none;}
   tr.detail.open{display:table-row;}
   tr.detail:hover{background:none;}
@@ -164,6 +166,7 @@
 </div>
 <div id="tip"></div>
 
+<script src="retrace.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 const tip = $("tip");
@@ -300,6 +303,19 @@ function drawDetail(tr) {
   detailPlot(td.querySelector(".dt-plot"), s, bars);
 }
 
+// 指數列展開：用共用的回補走勢圖（不加量與 MACD）；高低點取收盤價，與上表一致
+function idxRetrace(x) {
+  const d = x.last < 1000 ? 2 : 0;
+  return {en: x.name, dec: d, lowWord: "收盤低", swing: {high: {date: x.peak[0], v: x.peak[1]}, low: {date: x.low[0], v: x.low[1]},
+    path: x.series.filter(p => p[0] > x.low[0]).map(p => [p[0], p[1]]),
+    levels: x.levels.slice(0, 3).map(l => ({name: l.name, v: l.v}))}};
+}
+function drawIdxDetail(tr) {
+  const x = DATA.indices.find(y => y.key === tr.dataset.i), td = tr.firstChild;
+  if (!td.firstChild) td.innerHTML = `<div class="dt-t">${esc(x.name)} 回補走勢：以收盤低點為原點，之後每日收盤；滑鼠移到點上顯示該日回補水位</div><div id="ir_${x.key}" style="width:100%"></div><div class="legend" id="il_${x.key}"></div>
+    <div class="notes"><p>[註]：高低點取收盤價（與上表一致）；回補位 = 低點 + 比例 ×（高點 − 低點），38.2%、50%、61.8% 為常用比例，不具預測力。</p></div>`;
+  drawRetrace($("ir_" + x.key), idxRetrace(x), $("il_" + x.key));
+}
 let DATA;
 function drawCharts() {
   if (!DATA) return;
@@ -316,7 +332,8 @@ function drawCharts() {
     const o = DATA.overnight.find(y => y.key === el.dataset.k);
     if (o && o.line && o.line.length > 1) line(el, o.line, {h: 34, d: o.digits, levels: [{name: "", v: o.base}], name: o.name + "當晚走勢"});
   });
-  document.querySelectorAll("tr.detail.open").forEach(drawDetail);
+  document.querySelectorAll("tr.detail.open[data-d]").forEach(drawDetail);
+  document.querySelectorAll("tr.detail.open[data-i]").forEach(drawIdxDetail);
 }
 
 fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json()).then(j => {
@@ -328,14 +345,15 @@ fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json()).then(j => {
   $("idx").innerHTML = j.indices.map(x => {
     const d = x.last < 1000 ? 2 : 0;
     const ticks = x.levels.map(l => `<b style="left:${parseFloat(l.name)}%"></b>`).join("");
-    return `<tr><td class="name">${esc(x.name)}${x.live ? '<span class="tag">盤中</span>' : ""}<small>高 ${fmt(x.peak[1], d)}（${short(x.peak[0])}）／低 ${fmt(x.low[1], d)}（${short(x.low[0])}）</small></td>
+    return `<tr class="tg" tabindex="0" aria-expanded="false" data-k="${x.key}"><td class="name">${esc(x.name)}${x.live ? '<span class="tag">盤中</span>' : ""}<small>高 ${fmt(x.peak[1], d)}（${short(x.peak[0])}）／低 ${fmt(x.low[1], d)}（${short(x.low[0])}）</small></td>
       <td class="n" data-l="最新">${fmt(x.last, d)} <small>${short(x.date)}</small></td>
       <td class="n ${cls(x.chg)}" data-l="當日">${sign(x.chg, 2, "%")}</td>
       <td class="n ${cls(x.fromPeak)}" data-l="距高點">${sign(x.fromPeak, 1, "%")}</td>
       <td class="n ${cls(x.fromLow)}" data-l="距前低">${sign(x.fromLow, 1, "%")}</td>
       <td data-l="回補進度"><span><span class="rt"><i style="width:${Math.max(0, Math.min(100, x.retrace ?? 0))}%"></i>${ticks}</span><span class="rtv">${x.retrace == null ? "—" : fmt(x.retrace, 0) + "%"}</span></span></td>
       <td class="n" data-l="下一關卡">${x.next ? `${x.next.name} ${fmt(x.next.v, d)} <small>${sign(x.next.dist, 1, "%")}</small>` : "—"}</td>
-      <td class="n" data-l="大跌前收盤">${x.gap ? `${fmt(x.gap.v, d)} <small>${short(x.gap.date)} ${sign(x.gap.drop, 1, "%")}</small>` : "—"}</td></tr>`;
+      <td class="n" data-l="大跌前收盤">${x.gap ? `${fmt(x.gap.v, d)} <small>${short(x.gap.date)} ${sign(x.gap.drop, 1, "%")}</small>` : "—"}</td></tr>
+      <tr class="detail" data-i="${x.key}"><td colspan="8"></td></tr>`;
   }).join("");
   $("multi").innerHTML = j.indices.map(x =>
     `<div class="mc"><h3><span>${esc(x.name)}</span><small>${fmt(x.last, x.last < 1000 ? 2 : 0)}</small></h3><div class="plot" id="m_${x.key}"></div></div>`).join("");
@@ -353,6 +371,13 @@ fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json()).then(j => {
     tr.setAttribute("aria-expanded", open);
     if (open) drawDetail(dt);
   };
+  const toggleIdx = tr => {
+    const dt = tr.nextElementSibling, open = tr.classList.toggle("open");
+    dt.classList.toggle("open", open); tr.setAttribute("aria-expanded", open);
+    if (open) drawIdxDetail(dt);
+  };
+  $("idx").addEventListener("click", e => { const tr = e.target.closest("tr.tg"); if (tr) toggleIdx(tr); });
+  $("idx").addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches("tr.tg")) { e.preventDefault(); toggleIdx(e.target); } });
   $("a").addEventListener("click", e => { const tr = e.target.closest("tr.tg"); if (tr) toggle(tr); });
   $("a").addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches("tr.tg")) { e.preventDefault(); toggle(e.target); } });
   $("b").innerHTML = rowsHTML(j.rows.filter(r => !A.includes(r.group)));
