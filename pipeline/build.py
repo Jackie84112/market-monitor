@@ -556,6 +556,11 @@ def main():
         amd.main()
     except Exception as e:
         print("ERR amd", e)
+    try:   # 聯發科、博通回補走勢子頁資料
+        import retrace
+        retrace.main()
+    except Exception as e:
+        print("ERR retrace", e)
 
 
 if __name__ == "__main__":

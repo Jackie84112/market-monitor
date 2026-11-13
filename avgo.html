@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>博通 回補走勢</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* 色票與卡片沿用大盤監控（index.html），之後併回宏觀網站較省事；紅漲綠跌 */
+  :root{--bg:#F6F5F2;--card:#FFFFFF;--ink:#22262B;--muted:#6B7178;--line:#E4E2DC;--accent:#B04A2F;
+    --up:#DC2626;--dn:#15803D;--chart:#2563EB;--soft:#FAF9F6;}
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;margin:0;padding:0 16px 40px;font-size:14px;}
+  .wrap{max-width:1180px;margin:20px auto 0;display:flex;flex-direction:column;gap:14px;}
+  header{padding:4px 4px 0;}
+  .nav a{color:var(--accent);text-decoration:none;font-size:13px;}
+  .nav a:hover{text-decoration:underline;}
+  h1{font-size:28px;margin:6px 0 0;letter-spacing:.5px;}
+  .sub{color:var(--muted);font-size:13px;margin:4px 0 0;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0;}
+  .head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid var(--line);}
+  .head h2{font-size:23px;font-weight:700;margin:0;letter-spacing:.5px;padding-left:12px;border-left:4px solid var(--accent);line-height:1.15;}
+  .head span{color:var(--muted);font-size:13.5px;}
+  @media (max-width:640px){.head h2{font-size:20px;} .head span{font-size:12.5px;}}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;line-height:1.5;font-variant-numeric:tabular-nums;}
+  th{font-size:12px;font-weight:400;color:var(--muted);letter-spacing:.5px;text-align:left;padding:6px 10px;border-bottom:1px solid var(--ink);white-space:nowrap;}
+  td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:0;}
+  tbody tr:hover{background:var(--soft);}
+  .n{text-align:right;white-space:nowrap;} th.n{text-align:right;}
+  .up{color:var(--up);} .dn{color:var(--dn);} .mu{color:var(--muted);}
+  .tag{display:inline-block;font-size:11.5px;padding:0 6px;border-radius:5px;background:#FBF1DD;color:#92600F;margin-left:6px;}
+  small{font-size:12px;color:var(--muted);}
+  .chip{display:inline-block;font-size:12px;line-height:1.6;padding:0 8px;border-radius:5px;background:#EFEEEA;color:#4B5158;white-space:nowrap;}
+  .chip.g{background:#E7F3EB;color:#15803D;} .chip.r{background:#FBEAEA;color:#C02323;}
+  .st{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .notes{margin:12px 0 0;font-size:12px;color:var(--muted);line-height:1.6;}
+  .notes p{margin:2px 0;}
+  .warn{color:#C02323;}
+  svg{display:block;touch-action:pan-y;} svg text{font-family:inherit;font-variant-numeric:tabular-nums;}
+  #tip{position:fixed;pointer-events:none;background:rgba(34,38,43,.94);color:#F2F1EE;border-radius:8px;padding:6px 10px;font-size:12.5px;line-height:1.5;display:none;z-index:9;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .rt{position:relative;width:100%;height:10px;background:#EFEEEA;border-radius:5px;display:block;}
+  .rt i{position:absolute;left:0;top:0;bottom:0;background:var(--chart);border-radius:5px;}
+  .rt b{position:absolute;top:-3px;bottom:-3px;width:1px;background:#8C9096;}
+  .rtl{position:relative;height:16px;font-size:11px;color:var(--muted);margin-top:3px;}
+  .rtl span{position:absolute;transform:translateX(-50%);white-space:nowrap;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px;}
+  .kpi{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--soft);min-width:0;}
+  .kpi .l{font-size:12px;color:var(--muted);}
+  .kpi .v{font-size:22px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums;line-height:1.25;}
+  .kpi .s{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.45;}
+  .kpi.wide{grid-column:span 2;}
+  @media (max-width:520px){.kpi.wide{grid-column:span 1;}}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin:8px 0 0;}
+  .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .scroll table{min-width:440px;}
+  .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;}
+  .two>div{min-width:0;}
+  @media (max-width:900px){.two{grid-template-columns:minmax(0,1fr);}}
+  h3{font-size:15px;font-weight:700;margin:16px 0 6px;}
+  h3:first-child{margin-top:0;}
+  tr.curp td{background:#FBF1DD;font-weight:600;}
+  tr.cur td{background:#FFF8EA;}
+  .vb{display:grid;grid-template-columns:92px 1fr 96px;gap:8px;align-items:center;font-size:12.5px;padding:2px 0;font-variant-numeric:tabular-nums;}
+  .vb .t{height:10px;background:#EFEEEA;border-radius:5px;position:relative;}
+  .vb .t i{position:absolute;left:0;top:0;bottom:0;background:var(--chart);opacity:.7;border-radius:5px;}
+  .vb.cur .t i{background:var(--accent);opacity:1;}
+  .vb.cur{font-weight:600;}
+  .vb .r{text-align:right;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="nav"><a href="./">← 大盤監控</a></div>
+    <h1>博通 回補走勢</h1>
+    <p class="sub" id="sub">讀取中…</p>
+    <div class="st" id="st"></div>
+  </header>
+
+  <section class="card">
+    <div class="head"><h2>回補走勢</h2><span id="hsub">以低點為原點，之後每日收盤；滑鼠移到點上，顯示該日的回補水位</span></div>
+    <div id="rchart" style="width:100%"></div>
+    <div class="legend" id="rlegend"></div>
+    <div class="notes">
+      <p>[註1]：下方量柱為當日成交量（百萬股），紅柱代表當日收盤高於前一日、綠柱代表低於前一日；最左邊是低點當天的全日成交量。</p>
+      <p>[註2]：回補位 = 低點 + 比例 ×（高點 − 低點），高低點皆取盤中價；38.2%、50%、61.8% 是常用的回檔比例，不具預測力。高低點日期為手動設定（pipeline/retrace.py）。</p>
+    </div>
+  </section>
+</div>
+<script src="retrace.js"></script>
+<script>initPage("avgo");</script>
+</body>
+</html>
