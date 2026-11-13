@@ -250,6 +250,11 @@ def main():
     OUT.write_text(json.dumps(data, ensure_ascii=False, separators=(",", ":")), encoding="utf-8")
     q = data["quote"]
     print("AMD", q["date"], q["close"], f'{q["chg"]:+.2f}%', "量能", data["volume"]["state"], "回補", data["swing"]["retrace"], "%")
+    try:   # Non-GAAP PE 水位（獨立檔 data/amd_pe.json，失敗沿用舊檔）
+        import amd_pe
+        amd_pe.main()
+    except Exception as e:
+        print("ERR AMD PE", e)
 
 
 if __name__ == "__main__":

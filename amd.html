@@ -74,6 +74,11 @@
   .sw i{width:34px;height:20px;border-radius:10px;background:#C9CDD2;position:relative;transition:background .15s;}
   .sw i::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s;}
   .sw.on i{background:var(--chart);} .sw.on i::after{left:16px;}
+  .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:#fff;}
+  .seg button{font:inherit;font-size:13.5px;border:0;background:transparent;color:var(--ink);padding:5px 16px;cursor:pointer;}
+  .seg button.on{background:var(--ink);color:#fff;}
+  .ctl .sw{margin-left:0;}
   .lg{cursor:pointer;user-select:none;display:inline-flex;align-items:center;}
   .lg.off{opacity:.38;text-decoration:line-through;}
 </style>
@@ -111,16 +116,18 @@
   </section>
 
   <section class="card">
-    <div class="head"><h2>走勢與關鍵價位</h2><span>近 100 個交易日 K 線、均線與支撐壓力；量柱在下方</span></div>
-    <div id="chart" style="width:100%"></div>
-    <div class="legend" id="legend"></div>
-    <h3 style="margin-top:18px">價位地圖</h3>
-    <div class="scroll"><table><thead><tr><th>類別</th><th>價位</th><th class="n">距現價</th><th>依據</th></tr></thead><tbody id="levels"></tbody></table></div>
-    <h3>未回補缺口</h3>
-    <div id="gaps"></div>
+    <div class="head"><h2>Non-GAAP PE 水位</h2><span id="pesub">日 K 線疊上 Non-GAAP 本益比（trailing）</span></div>
+    <div class="ctl">
+      <div class="seg" id="perange"><button type="button" data-y="1">1 年</button><button type="button" data-y="2">2 年</button><button type="button" data-y="3" class="on">3 年</button></div>
+      <button class="sw on" id="pesw" type="button" aria-pressed="true"><i></i><b>Non-GAAP PE：開</b></button>
+    </div>
+    <div class="kpis" id="pekpis" style="margin:12px 0"></div>
+    <div id="pechart" style="width:100%"></div>
+    <div class="legend" id="pelegend"></div>
     <div class="notes">
-      <p>[註1]：價位地圖由人工整理，整理日見頁首更新時間下方的標示；均線、回補位與缺口由程式每次更新時重算。</p>
-      <p>[註2]：重疊的價位（例如 582–585 與 567.7–569.3）屬於同一類型的區間，不是單一價格。</p>
+      <p>[註1]：PE = 當日收盤價 ÷ TTM Non-GAAP 稀釋 EPS（最近四季加總）；財報為盤後公布，隔一個交易日起才套用新的 TTM。</p>
+      <p>[註2]：Non-GAAP 稀釋 EPS 直接採公司在各季 8-K 財報新聞稿對帳表的數字，不另行調整；EPS 表手動維護（pipeline/amd_pe.py），出新財報要新增一列。</p>
+      <p>[註3]：百分位、中位數、最高最低都只看「所選期間」；EPS 是階梯式更新，財報日 PE 會跳動，不全是股價造成。</p>
     </div>
   </section>
 
@@ -202,7 +209,7 @@ const short = d => d ? d.slice(5).replace("-", "/") : "—";
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const twTime = t => t ? new Date(t * 1000).toLocaleString("zh-TW", {timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false}) : "—";
 const ratioCls = v => v >= 1.2 ? "up" : v <= 0.8 ? "dn" : "";
-let A, S, SC;
+let A, S, SC, PE;
 
 function showTip(e, html) {
   tip.innerHTML = html; tip.style.display = "block";
@@ -211,71 +218,70 @@ function showTip(e, html) {
   tip.style.top = Math.max(6, e.clientY - 70) + "px";
 }
 
-// K 線＋均線＋關鍵價位＋量柱
-function drawChart() {
-  const el = $("chart"), c = A.chart, cd = c.candles, n = cd.length;
-  const W = Math.max(el.clientWidth, 280), narrow = W < 560;
-  const L = 38, R = narrow ? 52 : 88, T = 10, PH = narrow ? 250 : 300, VH = 64, GAP = 14, B = 22, H = T + PH + GAP + VH + B;
-  const MAS = [["sma20", "月線 SMA20", "#2563EB"], ["sma50", "SMA50", "#F59E0B"], ["sma100", "SMA100", "#8C9096"], ["sma200", "SMA200", "#7C3AED"]];
-  let lo = Math.min(...cd.map(x => x[3])), hi = Math.max(...cd.map(x => x[2]));
-  const pad = (hi - lo) * .04; lo -= pad; hi += pad;   // 價格範圍只看 K 線；均線超出範圍的部分裁掉，避免 SMA200 把圖壓扁
-  const X = i => L + (W - L - R) * (i + .5) / n, Y = v => T + PH * (1 - (v - lo) / (hi - lo));
-  const bw = Math.max(2, (W - L - R) / n * .62);
-  const vmax = Math.max(...cd.map(x => x[5])), VY = v => T + PH + GAP + VH * (1 - v / vmax);
+// Non-GAAP PE 水位：日 K 線（左軸、紅漲綠跌）＋ PE 線（右軸，可開關）；期間 1/2/3 年；財報日在底部標 E
+const PEST = {years: 3, on: true};
+function drawPE() {
+  const P = PE, last = P.candles[P.candles.length - 1][0], dd = new Date(last + "T00:00:00Z");
+  dd.setUTCFullYear(dd.getUTCFullYear() - PEST.years);
+  const cut = dd.toISOString().slice(0, 10);
+  let i0 = P.candles.findIndex(c => c[0] >= cut); if (i0 < 0) i0 = 0;
+  const cd = P.candles.slice(i0), pe = P.pe.slice(i0), tt = P.ttm.slice(i0), n = cd.length, on = PEST.on;
+  const el = $("pechart"), W = Math.max(el.clientWidth, 300), narrow = W < 560;
+  const L = 44, R = on ? (narrow ? 44 : 52) : 14, T = 24, PH = narrow ? 300 : 400, B = 38, H = T + PH + B;
+  let lo = Math.min(...cd.map(x => x[3])), hi = Math.max(...cd.map(x => x[2])); const pad = (hi - lo) * .05; lo = Math.max(0, lo - pad); hi += pad;
+  const plo = 0, phi = Math.ceil(Math.max(...pe) / 20) * 20;
+  const X = i => L + (W - L - R) * (i + .5) / n, Y = v => T + PH * (1 - (v - lo) / (hi - lo)), YP = v => T + PH * (1 - (v - plo) / (phi - plo));
+  const bw = Math.max(1, (W - L - R) / n * .66);
   let g = "";
-  // 價格刻度
-  const step = (hi - lo) > 220 ? 50 : (hi - lo) > 110 ? 25 : 10;
-  for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) {
-    g += `<line x1="${L}" x2="${W - R}" y1="${Y(p)}" y2="${Y(p)}" stroke="#EEEDE8" stroke-width="1"/><text x="${L - 5}" y="${Y(p) + 3.5}" font-size="10.5" fill="#9AA0A6" text-anchor="end">${p}</text>`;
+  const step = (hi - lo) > 450 ? 100 : (hi - lo) > 220 ? 50 : (hi - lo) > 110 ? 25 : 10;
+  for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) g += `<line x1="${L}" x2="${W - R}" y1="${Y(p)}" y2="${Y(p)}" stroke="#EEEDE8"/><text x="${L - 6}" y="${Y(p) + 3.5}" font-size="10.5" fill="#9AA0A6" text-anchor="end">${p}</text>`;
+  g += `<text x="${L - 6}" y="${T - 2}" font-size="10" fill="#9AA0A6" text-anchor="end">股價</text>`;
+  if (on) {
+    for (let p = 0; p <= phi; p += 20) g += `<text x="${W - R + 6}" y="${YP(p) + 3.5}" font-size="10.5" fill="#B04A2F">${p}x</text>`;
+    g += `<text x="${W - R + 6}" y="${T - 2}" font-size="10" fill="#B04A2F">PE</text>`;
   }
-  // 關鍵價位（只畫在可見範圍內，標籤太近就略過）
-  const lv = A.levels.filter(l => l.v > lo && l.v < hi).sort((a, b) => b.v - a.v);
-  let lastY = -99;
-  lv.forEach(l => {
-    const col = l.cat === "壓力" ? "#DC2626" : "#15803D";
-    g += `<line x1="${L}" x2="${W - R}" y1="${Y(l.v)}" y2="${Y(l.v)}" stroke="${col}" stroke-opacity=".45" stroke-width="1" stroke-dasharray="4 3"/>`;
-  });
-  // 均線
-  let mg = "";
-  MAS.forEach(([k, , col]) => {
-    let d = "";
-    c[k].forEach((v, i) => { if (v != null) d += (d ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1); });
-    mg += `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.4" stroke-linejoin="round" opacity=".9"/>`;
-  });
-  g += `<clipPath id="pc"><rect x="${L}" y="${T - 2}" width="${W - L - R}" height="${PH + 4}"/></clipPath><g clip-path="url(#pc)">${mg}</g>`;
-  // K 線與量柱（紅漲綠跌）
   cd.forEach((x, i) => {
     const up = x[4] >= x[1], col = up ? "var(--up)" : "var(--dn)", cx = X(i);
-    g += `<line x1="${cx}" x2="${cx}" y1="${Y(x[2])}" y2="${Y(x[3])}" stroke="${col}" stroke-width="1"/>`;
+    g += `<line x1="${cx.toFixed(1)}" x2="${cx.toFixed(1)}" y1="${Y(x[2]).toFixed(1)}" y2="${Y(x[3]).toFixed(1)}" stroke="${col}" stroke-width="1"/>`;
     g += `<rect x="${(cx - bw / 2).toFixed(1)}" y="${Math.min(Y(x[1]), Y(x[4])).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, Math.abs(Y(x[1]) - Y(x[4]))).toFixed(1)}" fill="${col}"/>`;
-    g += `<rect x="${(cx - bw / 2).toFixed(1)}" y="${VY(x[5]).toFixed(1)}" width="${bw.toFixed(1)}" height="${(T + PH + GAP + VH - VY(x[5])).toFixed(1)}" fill="${col}" opacity=".45"/>`;
   });
-  // 右側價位標籤（由高到低，太近略過）
-  const lab = [...lv].sort((a, b) => b.v - a.v); lastY = -99;
-  lab.forEach(l => {
-    const y = Y(l.v);
-    if (y - lastY >= 12) {
-      g += `<text x="${W - R + 4}" y="${y + 3.5}" font-size="10.5" fill="${l.cat === "壓力" ? "#C02323" : "#15803D"}" font-weight="600">${l.name}</text>`;
-      lastY = y;
-    }
+  const sorted = [...pe].sort((a, b) => a - b), med = sorted[Math.floor(n / 2)];
+  if (on) {
+    g += `<line x1="${L}" x2="${W - R}" y1="${YP(med)}" y2="${YP(med)}" stroke="#B04A2F" stroke-opacity=".55" stroke-dasharray="5 4"/><text x="${L + 4}" y="${YP(med) - 4}" font-size="11" fill="#B04A2F">中位數 ${fmt(med, 1)}x</text>`;
+    g += `<path d="${pe.map((v, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + YP(v).toFixed(1)).join("")}" fill="none" stroke="#B04A2F" stroke-width="2" stroke-linejoin="round" opacity=".92"/>`;
+    g += `<circle cx="${X(n - 1)}" cy="${YP(pe[n - 1])}" r="4" fill="#B04A2F"/>`;
+  }
+  // 財報日（盤後公布，標在隔一個交易日）
+  P.releases.forEach(r => {
+    const i = cd.findIndex(c => c[0] > r.date); if (i < 0) return;
+    g += `<line x1="${X(i)}" x2="${X(i)}" y1="${T}" y2="${T + PH}" stroke="#8C9096" stroke-opacity=".28" stroke-dasharray="2 3"/><rect x="${X(i) - 8}" y="${T + PH + 3}" width="16" height="14" rx="3" fill="#8C9096"/><text x="${X(i)}" y="${T + PH + 13.5}" font-size="9.5" font-weight="700" fill="#fff" text-anchor="middle">E</text>`;
   });
-  // X 軸日期
-  const ticks = [0, Math.round((n - 1) / 4), Math.round((n - 1) / 2), Math.round((n - 1) * .75), n - 1];
-  ticks.forEach((i, k) => { g += `<text x="${X(i)}" y="${H - 6}" font-size="10.5" fill="#6B7178" text-anchor="${k === 0 ? "start" : k === ticks.length - 1 ? "end" : "middle"}">${short(cd[i][0])}</text>`; });
-  g += `<text x="${L}" y="${T + PH + GAP + 9}" font-size="10" fill="#9AA0A6">量（百萬股）</text>`;
-  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="AMD K 線圖">${g}
-    <line class="ch" y1="${T}" y2="${T + PH + GAP + VH}" stroke="#8C9096" stroke-width="1" style="display:none"/>
-    <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
+  g += `<line x1="${L}" x2="${W - R}" y1="${T + PH}" y2="${T + PH}" stroke="#8C9096"/>`;
+  const nt = narrow ? 4 : 7;
+  for (let k = 0; k < nt; k++) { const i = Math.round((n - 1) * k / (nt - 1)); g += `<text x="${X(i)}" y="${H - 5}" font-size="10.5" fill="#6B7178" text-anchor="${k === 0 ? "start" : k === nt - 1 ? "end" : "middle"}">${cd[i][0].slice(2).replace(/-/g, "/")}</text>`; }
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="AMD 日 K 線與 Non-GAAP 本益比">${g}<line class="ch" y1="${T}" y2="${T + PH}" stroke="#8C9096" style="display:none"/><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
   const svg = el.firstChild, ch = svg.querySelector(".ch");
   svg.addEventListener("pointermove", e => {
-    const r = svg.getBoundingClientRect(), i = Math.max(0, Math.min(n - 1, Math.round((e.clientX - r.left - L) / (W - L - R) * n - .5)));
-    const x = cd[i], prev = i ? cd[i - 1][4] : null;
+    const r = svg.getBoundingClientRect(), i = Math.max(0, Math.min(n - 1, Math.round((e.clientX - r.left - L) / (W - L - R) * n - .5))), x = cd[i], prev = i ? cd[i - 1][4] : null;
     ch.setAttribute("x1", X(i)); ch.setAttribute("x2", X(i)); ch.style.display = "";
-    showTip(e, `${x[0].replace(/-/g, "/")}${prev ? `　<b>${sign((x[4] / prev - 1) * 100, 2, "%")}</b>` : ""}<br>開 ${fmt(x[1])}　高 ${fmt(x[2])}<br>低 ${fmt(x[3])}　收 <b>${fmt(x[4])}</b><br>量 ${fmt(x[5], 1)} 百萬股`);
+    showTip(e, `${x[0].replace(/-/g, "/")}${prev ? `　<b>${sign((x[4] / prev - 1) * 100, 2, "%")}</b>` : ""}<br>開 ${fmt(x[1])}　高 ${fmt(x[2])}<br>低 ${fmt(x[3])}　收 <b>${fmt(x[4])}</b><br>TTM EPS ${fmt(tt[i])}　PE <b>${fmt(pe[i], 1)}x</b>`);
   });
   svg.addEventListener("pointerleave", () => { ch.style.display = "none"; tip.style.display = "none"; });
-  $("legend").innerHTML = MAS.map(([, nm, col]) => `<span><i style="background:${col}"></i>${nm}</span>`).join("") +
-    `<span><i style="background:#DC2626;opacity:.6"></i>壓力</span><span><i style="background:#15803D;opacity:.6"></i>支撐</span><span>K 線：紅漲綠跌</span>`;
+  $("pelegend").innerHTML = `<span>K 線：紅漲綠跌（左軸，美元）</span>` + (on ? `<span><i style="background:#B04A2F"></i>Non-GAAP PE（右軸）</span><span><i style="background:#B04A2F;height:0;border-top:2px dashed #B04A2F"></i>期間中位數</span>` : "") + `<span><b style="display:inline-block;background:#8C9096;color:#fff;font-size:9.5px;border-radius:3px;padding:0 4px;margin-right:4px">E</b>財報公布日（隔日起換 TTM）</span>`;
+  // 水位卡
+  const cur = pe[n - 1], mn = sorted[0], mx = sorted[n - 1], pc = pe.filter(x => x <= cur).length / n * 100;
+  const dOf = v => cd[pe.indexOf(v)][0].slice(2).replace(/-/g, "/");
+  $("pekpis").innerHTML = `
+    <div class="kpi"><div class="l">目前 Non-GAAP PE</div><div class="v">${fmt(cur, 1)}x</div><div class="s">收盤 ${fmt(cd[n - 1][4])} ÷ TTM EPS ${fmt(tt[n - 1])}</div></div>
+    <div class="kpi"><div class="l">${PEST.years} 年百分位</div><div class="v">${fmt(pc, 0)}%</div><div class="s">期間內 ${fmt(pc, 0)}% 的交易日 PE 不高於現在</div></div>
+    <div class="kpi"><div class="l">期間中位數</div><div class="v">${fmt(med, 1)}x</div><div class="s">現在較中位數 <span class="${cls(cur - med)}">${sign((cur / med - 1) * 100, 0, "%")}</span></div></div>
+    <div class="kpi"><div class="l">期間最低／最高</div><div class="v" style="font-size:18px">${fmt(mn, 1)}x ／ ${fmt(mx, 1)}x</div><div class="s">${dOf(mn)}／${dOf(mx)}</div></div>
+    <div class="kpi"><div class="l">TTM Non-GAAP EPS</div><div class="v">${fmt(P.ttm[P.ttm.length - 1])}</div><div class="s">${P.eps.slice(-4).map(e => e.q + " " + fmt(e.eps)).join("　")}</div></div>`;
+  $("pesub").textContent = `日 K 線疊上 Non-GAAP 本益比（trailing）；${cd[0][0].replace(/-/g, "/")}–${cd[n - 1][0].replace(/-/g, "/")}，${n} 個交易日`;
+}
+function syncPE() {
+  const b = $("pesw"); b.classList.toggle("on", PEST.on); b.setAttribute("aria-pressed", PEST.on); b.lastChild.textContent = "Non-GAAP PE：" + (PEST.on ? "開" : "關");
+  $("perange").querySelectorAll("button").forEach(x => x.classList.toggle("on", +x.dataset.y === PEST.years));
 }
 
 // 回補走勢：原點＝低點日最低價，Y 軸涵蓋 0%（低點）到 100%（高點）；滑鼠移到點上自動標出該日回補水位（虛線）與只有股價的浮標；下方為每日量柱
@@ -499,19 +505,7 @@ function render() {
     <div class="notes" style="margin-top:8px"><p>[註]：回補位 = 低點 + 比例 ×（高點 − 低點）；38.2%、50%、61.8%、78.6% 是常用的回檔比例，不具預測力。高低點日期為手動設定（pipeline/amd.py）。</p></div>`;
 
   drawRetrace();
-  drawChart();
-
-  // 價位地圖
-  const lv = [...A.levels].sort((a, b) => b.v - a.v);
-  let h = "", placed = false;
-  const curRow = `<tr class="curp"><td colspan="2">▶ 現價 ${fmt(cur)}</td><td class="n">—</td><td>${q.date.replace(/-/g, "/")} 收盤</td></tr>`;
-  lv.forEach(l => {
-    if (!placed && l.v < cur) { h += curRow; placed = true; }
-    h += `<tr><td><span class="chip ${l.cat === "壓力" ? "r" : "g"}">${l.cat}</span></td><td>${l.name}</td><td class="n ${cls(l.dist)}">${sign(l.dist, 1, "%")}</td><td>${esc(l.basis)}</td></tr>`;
-  });
-  if (!placed) h += curRow;
-  $("levels").innerHTML = h;
-  $("gaps").innerHTML = A.gaps.length ? `<table><thead><tr><th>方向</th><th class="n">缺口區間</th><th>形成</th><th class="n">距現價</th></tr></thead><tbody>${A.gaps.map(g => `<tr><td>${g.type}缺口</td><td class="n">${fmt(g.lo)}–${fmt(g.hi)}</td><td>${short(g.from)} → ${short(g.to)}</td><td class="n ${cls((g.hi / cur - 1))}">${sign((g.hi / cur - 1) * 100, 1, "%")}</td></tr>`).join("")}</tbody></table>` : '<span class="mu">目前沒有未回補的缺口</span>';
+  drawPE();
 
   // 量能
   $("vkpis").innerHTML = `
@@ -566,12 +560,15 @@ function renderStatic() {
 Promise.all([
   fetch("data/amd.json", {cache: "no-store"}).then(r => r.json()),
   fetch("data/amd_static.json", {cache: "no-store"}).then(r => r.json()),
-  fetch("data/amd_scenario.json", {cache: "no-store"}).then(r => r.json())
-]).then(([a, s, sc]) => {
-  A = a; S = s; SC = sc;
+  fetch("data/amd_scenario.json", {cache: "no-store"}).then(r => r.json()),
+  fetch("data/amd_pe.json", {cache: "no-store"}).then(r => r.json())
+]).then(([a, s, sc, pe]) => {
+  A = a; S = s; SC = sc; PE = pe;
   render(); renderStatic(); drawScenario();
+  $("pesw").onclick = () => { PEST.on = !PEST.on; syncPE(); drawPE(); };
+  $("perange").onclick = e => { const y = e.target.dataset && e.target.dataset.y; if (y) { PEST.years = +y; syncPE(); drawPE(); } };
   $("scsw").onclick = () => { SC_ON.all = !SC_ON.all; syncSw(); drawScenario(); };
-  let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { drawRetrace(); drawScenario(); drawChart(); drawMacd(); }, 150); });
+  let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { drawRetrace(); drawScenario(); drawPE(); drawMacd(); }, 150); });
 }).catch(e => { $("sub").innerHTML = `<span class="warn">資料讀取失敗：${e}</span>`; console.error(e); });
 </script>
 </body>
