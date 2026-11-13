@@ -551,6 +551,11 @@ def main():
     for k, v in status.items():
         if v["err"]:
             print("ERR", k, v["err"])
+    try:   # AMD 子頁資料：獨立容錯，失敗不影響上面的大盤資料
+        import amd
+        amd.main()
+    except Exception as e:
+        print("ERR amd", e)
 
 
 if __name__ == "__main__":

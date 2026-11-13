@@ -1,0 +1,377 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AMD 監控</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  /* 色票與卡片沿用大盤監控（index.html），之後併回宏觀網站較省事；紅漲綠跌 */
+  :root{--bg:#F6F5F2;--card:#FFFFFF;--ink:#22262B;--muted:#6B7178;--line:#E4E2DC;--accent:#B04A2F;
+    --up:#DC2626;--dn:#15803D;--chart:#2563EB;--soft:#FAF9F6;}
+  *{box-sizing:border-box}
+  body{background:var(--bg);color:var(--ink);font-family:"Noto Sans TC","Microsoft JhengHei","PingFang TC",system-ui,sans-serif;margin:0;padding:0 16px 40px;font-size:14px;}
+  .wrap{max-width:1180px;margin:20px auto 0;display:flex;flex-direction:column;gap:14px;}
+  header{padding:4px 4px 0;}
+  .nav a{color:var(--accent);text-decoration:none;font-size:13px;}
+  .nav a:hover{text-decoration:underline;}
+  h1{font-size:28px;margin:6px 0 0;letter-spacing:.5px;}
+  .sub{color:var(--muted);font-size:13px;margin:4px 0 0;}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0;}
+  .head{display:flex;flex-wrap:wrap;align-items:baseline;gap:4px 14px;margin:0 0 14px;padding-bottom:10px;border-bottom:1px solid var(--line);}
+  .head h2{font-size:23px;font-weight:700;margin:0;letter-spacing:.5px;padding-left:12px;border-left:4px solid var(--accent);line-height:1.15;}
+  .head span{color:var(--muted);font-size:13.5px;}
+  @media (max-width:640px){.head h2{font-size:20px;} .head span{font-size:12.5px;}}
+  table{width:100%;border-collapse:collapse;font-size:13.5px;line-height:1.5;font-variant-numeric:tabular-nums;}
+  th{font-size:12px;font-weight:400;color:var(--muted);letter-spacing:.5px;text-align:left;padding:6px 10px;border-bottom:1px solid var(--ink);white-space:nowrap;}
+  td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:middle;}
+  tbody tr:last-child td{border-bottom:0;}
+  tbody tr:hover{background:var(--soft);}
+  .n{text-align:right;white-space:nowrap;} th.n{text-align:right;}
+  .up{color:var(--up);} .dn{color:var(--dn);} .mu{color:var(--muted);}
+  .tag{display:inline-block;font-size:11.5px;padding:0 6px;border-radius:5px;background:#FBF1DD;color:#92600F;margin-left:6px;}
+  small{font-size:12px;color:var(--muted);}
+  .chip{display:inline-block;font-size:12px;line-height:1.6;padding:0 8px;border-radius:5px;background:#EFEEEA;color:#4B5158;white-space:nowrap;}
+  .chip.g{background:#E7F3EB;color:#15803D;} .chip.r{background:#FBEAEA;color:#C02323;}
+  .st{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
+  .notes{margin:12px 0 0;font-size:12px;color:var(--muted);line-height:1.6;}
+  .notes p{margin:2px 0;}
+  .warn{color:#C02323;}
+  svg{display:block;touch-action:pan-y;} svg text{font-family:inherit;font-variant-numeric:tabular-nums;}
+  #tip{position:fixed;pointer-events:none;background:rgba(34,38,43,.94);color:#F2F1EE;border-radius:8px;padding:6px 10px;font-size:12.5px;line-height:1.5;display:none;z-index:9;font-variant-numeric:tabular-nums;white-space:nowrap;}
+  .rt{position:relative;width:100%;height:10px;background:#EFEEEA;border-radius:5px;display:block;}
+  .rt i{position:absolute;left:0;top:0;bottom:0;background:var(--chart);border-radius:5px;}
+  .rt b{position:absolute;top:-3px;bottom:-3px;width:1px;background:#8C9096;}
+  .rtl{position:relative;height:16px;font-size:11px;color:var(--muted);margin-top:3px;}
+  .rtl span{position:absolute;transform:translateX(-50%);white-space:nowrap;}
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:10px;}
+  .kpi{border:1px solid var(--line);border-radius:8px;padding:10px 12px;background:var(--soft);min-width:0;}
+  .kpi .l{font-size:12px;color:var(--muted);}
+  .kpi .v{font-size:22px;font-weight:700;margin-top:2px;font-variant-numeric:tabular-nums;line-height:1.25;}
+  .kpi .s{font-size:12px;color:var(--muted);margin-top:2px;line-height:1.45;}
+  .kpi.wide{grid-column:span 2;}
+  @media (max-width:520px){.kpi.wide{grid-column:span 1;}}
+  .legend{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);margin:8px 0 0;}
+  .legend i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+  .scroll{overflow-x:auto;-webkit-overflow-scrolling:touch;}
+  .scroll table{min-width:440px;}
+  .two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;}
+  .two>div{min-width:0;}
+  @media (max-width:900px){.two{grid-template-columns:minmax(0,1fr);}}
+  h3{font-size:15px;font-weight:700;margin:16px 0 6px;}
+  h3:first-child{margin-top:0;}
+  tr.curp td{background:#FBF1DD;font-weight:600;}
+  tr.cur td{background:#FFF8EA;}
+  .vb{display:grid;grid-template-columns:92px 1fr 96px;gap:8px;align-items:center;font-size:12.5px;padding:2px 0;font-variant-numeric:tabular-nums;}
+  .vb .t{height:10px;background:#EFEEEA;border-radius:5px;position:relative;}
+  .vb .t i{position:absolute;left:0;top:0;bottom:0;background:var(--chart);opacity:.7;border-radius:5px;}
+  .vb.cur .t i{background:var(--accent);opacity:1;}
+  .vb.cur{font-weight:600;}
+  .vb .r{text-align:right;}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="nav"><a href="./">← 大盤監控</a></div>
+    <h1>AMD 監控</h1>
+    <p class="sub" id="sub">讀取中…</p>
+    <div class="st" id="st"></div>
+  </header>
+
+  <section class="card">
+    <div class="head"><h2>現況</h2><span>位置、動能與量能一覽；10/6 高點至 11/5 低點的回補進度</span></div>
+    <div class="kpis" id="kpis"></div>
+    <div style="margin-top:16px" id="retrace"></div>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>走勢與關鍵價位</h2><span>近 100 個交易日 K 線、均線與支撐壓力；量柱在下方</span></div>
+    <div id="chart" style="width:100%"></div>
+    <div class="legend" id="legend"></div>
+    <h3 style="margin-top:18px">價位地圖</h3>
+    <div class="scroll"><table><thead><tr><th>類別</th><th>價位</th><th class="n">距現價</th><th>依據</th></tr></thead><tbody id="levels"></tbody></table></div>
+    <h3>未回補缺口</h3>
+    <div id="gaps"></div>
+    <div class="notes">
+      <p>[註1]：價位地圖由人工整理，整理日見頁首更新時間下方的標示；均線、回補位與缺口由程式每次更新時重算。</p>
+      <p>[註2]：重疊的價位（例如 582–585 與 567.7–569.3）屬於同一類型的區間，不是單一價格。</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>量能</h2><span>目前處於量增、量平或量縮；量價分布看哪一段成交最密集</span></div>
+    <div class="kpis" id="vkpis"></div>
+    <div class="two" style="margin-top:16px">
+      <div>
+        <h3>近 10 個交易日</h3>
+        <div class="scroll"><table><thead><tr><th>日期</th><th class="n">漲跌</th><th class="n">成交量（百萬股）</th><th class="n">對前 20 日均量</th></tr></thead><tbody id="vdays"></tbody></table></div>
+      </div>
+      <div>
+        <h3 id="vbpt">量價分布</h3>
+        <div id="vbp"></div>
+      </div>
+    </div>
+    <div class="notes">
+      <p>[註1]：量增、量縮的定義是近 10 日均量對近 60 日均量的比值：高於 1.2 為量增，低於 0.8 為量縮。門檻是人為選定的整數，不是理論值。</p>
+      <p>[註2]：近 60 日均量會把最近的大量算進去，所以放量之後即使成交量回到正常水準，比值也會自己降下來；一年基準較不受影響。</p>
+      <p>[註3]：量價分布把每天的成交量平均分攤在當天最高價與最低價之間，是近似值，只適合比較相對大小。</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>均線與動能</h2><span>站上哪些均線、離均線多遠；MACD 柱狀圖方向</span></div>
+    <div class="two">
+      <div>
+        <h3>均線</h3>
+        <div class="scroll"><table><thead><tr><th>均線</th><th class="n">數值</th><th class="n">5 日變化</th><th class="n">乖離</th><th class="n">站上天數</th></tr></thead><tbody id="mas"></tbody></table></div>
+      </div>
+      <div>
+        <h3>MACD（12, 26, 9）</h3>
+        <div id="macdnum" class="kpis" style="grid-template-columns:repeat(3,1fr)"></div>
+        <div id="macd" style="margin-top:8px"></div>
+        <div class="legend"><span><i style="background:var(--chart)"></i>MACD 線</span><span><i style="background:#F59E0B"></i>信號線</span><span>柱：紅為正、綠為負</span></div>
+      </div>
+    </div>
+    <div class="notes">
+      <p>[註1]：乖離 = 收盤價相對均線的百分比；站上天數 = 目前連續收在均線之上的交易日數。</p>
+      <p>[註2]：均線與 MACD 都由價格算出，彼此並非獨立的證據；歷史回測顯示它們對後續報酬沒有穩定的預測力，只用來描述位置與動能。</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>板塊對照</h2><span>AMD 的強弱有沒有板塊支持</span></div>
+    <div class="kpis" id="sox"></div>
+    <div class="notes"><p>[註]：SOX 為費城半導體指數；「自低點」從 11/5 收盤起算。</p></div>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>歷史情境</h2><span id="scsub">急漲之後歷史上怎麼走</span></div>
+    <div class="scroll"><table id="sctb"></table></div>
+    <h3 style="margin-top:20px">歷史急漲事件</h3>
+    <div class="scroll"><table style="min-width:860px"><thead><tr><th>結束日</th><th class="n">5 日漲幅</th><th class="n">起點 → 終點</th><th class="n">急漲前跌幅</th><th class="n">回補比例</th><th class="n">之後 5 日</th><th class="n">之後 10 日</th><th class="n">之後 20 日</th><th>事件（摘要）</th></tr></thead><tbody id="evs"></tbody></table></div>
+    <h3 style="margin-top:20px">量能對照：這次與歷史急漲</h3>
+    <div class="scroll"><table style="min-width:560px"><thead><tr><th>指標</th><th class="n">這次</th><th class="n">16 次中位數</th><th class="n">2017/5/16</th><th class="n">2017/6/22</th></tr></thead><tbody id="vcmp"></tbody></table></div>
+    <h3 style="margin-top:20px">量能最像這次的五次</h3>
+    <div class="scroll"><table style="min-width:620px"><thead><tr><th>日期</th><th class="n">前高到低點</th><th class="n">低點日量能</th><th class="n">之後 5 日</th><th class="n">之後 10 日</th><th class="n">之後 20 日</th><th class="n">20 日內最深低點</th></tr></thead><tbody id="vsim"></tbody></table></div>
+    <div class="notes" id="scnotes"></div>
+  </section>
+
+  <section class="card">
+    <div class="notes" style="margin:0">
+      <p>[註1]：本頁整理 AMD 的公開行情數據與歷史統計，供追蹤參考，不構成投資建議；歷史統計樣本少、事件有重疊，不具預測力。</p>
+      <p>[註2]：行情資料來自 Yahoo Finance（日線與盤前盤後報價），可能有延遲或更正；GitHub 排程更新常晚數小時，請對照頁首的資料日。</p>
+      <p>[註3]：「歷史情境」區塊是固定快照（截至 2026/11/12），不會隨每日更新而重算。</p>
+    </div>
+  </section>
+</div>
+<div id="tip"></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const tip = $("tip");
+const fmt = (v, d = 2) => v == null ? "—" : Number(v).toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
+const sign = (v, d = 2, u = "") => v == null ? "—" : (v > 0 ? "+" : "") + fmt(v, d) + u;
+const cls = v => v > 0 ? "up" : v < 0 ? "dn" : "mu";
+const short = d => d ? d.slice(5).replace("-", "/") : "—";
+const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
+const twTime = t => t ? new Date(t * 1000).toLocaleString("zh-TW", {timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false}) : "—";
+const ratioCls = v => v >= 1.2 ? "up" : v <= 0.8 ? "dn" : "";
+let A, S;
+
+function showTip(e, html) {
+  tip.innerHTML = html; tip.style.display = "block";
+  const tw = tip.offsetWidth;
+  tip.style.left = Math.max(6, Math.min(innerWidth - tw - 6, e.clientX + 12)) + "px";
+  tip.style.top = Math.max(6, e.clientY - 70) + "px";
+}
+
+// K 線＋均線＋關鍵價位＋量柱
+function drawChart() {
+  const el = $("chart"), c = A.chart, cd = c.candles, n = cd.length;
+  const W = Math.max(el.clientWidth, 280), narrow = W < 560;
+  const L = 38, R = narrow ? 52 : 88, T = 10, PH = narrow ? 250 : 300, VH = 64, GAP = 14, B = 22, H = T + PH + GAP + VH + B;
+  const MAS = [["sma20", "月線 SMA20", "#2563EB"], ["sma50", "SMA50", "#F59E0B"], ["sma100", "SMA100", "#8C9096"], ["sma200", "SMA200", "#7C3AED"]];
+  let lo = Math.min(...cd.map(x => x[3])), hi = Math.max(...cd.map(x => x[2]));
+  const pad = (hi - lo) * .04; lo -= pad; hi += pad;   // 價格範圍只看 K 線；均線超出範圍的部分裁掉，避免 SMA200 把圖壓扁
+  const X = i => L + (W - L - R) * (i + .5) / n, Y = v => T + PH * (1 - (v - lo) / (hi - lo));
+  const bw = Math.max(2, (W - L - R) / n * .62);
+  const vmax = Math.max(...cd.map(x => x[5])), VY = v => T + PH + GAP + VH * (1 - v / vmax);
+  let g = "";
+  // 價格刻度
+  const step = (hi - lo) > 220 ? 50 : (hi - lo) > 110 ? 25 : 10;
+  for (let p = Math.ceil(lo / step) * step; p <= hi; p += step) {
+    g += `<line x1="${L}" x2="${W - R}" y1="${Y(p)}" y2="${Y(p)}" stroke="#EEEDE8" stroke-width="1"/><text x="${L - 5}" y="${Y(p) + 3.5}" font-size="10.5" fill="#9AA0A6" text-anchor="end">${p}</text>`;
+  }
+  // 關鍵價位（只畫在可見範圍內，標籤太近就略過）
+  const lv = A.levels.filter(l => l.v > lo && l.v < hi).sort((a, b) => b.v - a.v);
+  let lastY = -99;
+  lv.forEach(l => {
+    const col = l.cat === "壓力" ? "#DC2626" : "#15803D";
+    g += `<line x1="${L}" x2="${W - R}" y1="${Y(l.v)}" y2="${Y(l.v)}" stroke="${col}" stroke-opacity=".45" stroke-width="1" stroke-dasharray="4 3"/>`;
+  });
+  // 均線
+  let mg = "";
+  MAS.forEach(([k, , col]) => {
+    let d = "";
+    c[k].forEach((v, i) => { if (v != null) d += (d ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1); });
+    mg += `<path d="${d}" fill="none" stroke="${col}" stroke-width="1.4" stroke-linejoin="round" opacity=".9"/>`;
+  });
+  g += `<clipPath id="pc"><rect x="${L}" y="${T - 2}" width="${W - L - R}" height="${PH + 4}"/></clipPath><g clip-path="url(#pc)">${mg}</g>`;
+  // K 線與量柱（紅漲綠跌）
+  cd.forEach((x, i) => {
+    const up = x[4] >= x[1], col = up ? "var(--up)" : "var(--dn)", cx = X(i);
+    g += `<line x1="${cx}" x2="${cx}" y1="${Y(x[2])}" y2="${Y(x[3])}" stroke="${col}" stroke-width="1"/>`;
+    g += `<rect x="${(cx - bw / 2).toFixed(1)}" y="${Math.min(Y(x[1]), Y(x[4])).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, Math.abs(Y(x[1]) - Y(x[4]))).toFixed(1)}" fill="${col}"/>`;
+    g += `<rect x="${(cx - bw / 2).toFixed(1)}" y="${VY(x[5]).toFixed(1)}" width="${bw.toFixed(1)}" height="${(T + PH + GAP + VH - VY(x[5])).toFixed(1)}" fill="${col}" opacity=".45"/>`;
+  });
+  // 右側價位標籤（由高到低，太近略過）
+  const lab = [...lv].sort((a, b) => b.v - a.v); lastY = -99;
+  lab.forEach(l => {
+    const y = Y(l.v);
+    if (y - lastY >= 12) {
+      g += `<text x="${W - R + 4}" y="${y + 3.5}" font-size="10.5" fill="${l.cat === "壓力" ? "#C02323" : "#15803D"}" font-weight="600">${l.name}</text>`;
+      lastY = y;
+    }
+  });
+  // X 軸日期
+  const ticks = [0, Math.round((n - 1) / 4), Math.round((n - 1) / 2), Math.round((n - 1) * .75), n - 1];
+  ticks.forEach((i, k) => { g += `<text x="${X(i)}" y="${H - 6}" font-size="10.5" fill="#6B7178" text-anchor="${k === 0 ? "start" : k === ticks.length - 1 ? "end" : "middle"}">${short(cd[i][0])}</text>`; });
+  g += `<text x="${L}" y="${T + PH + GAP + 9}" font-size="10" fill="#9AA0A6">量（百萬股）</text>`;
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="AMD K 線圖">${g}
+    <line class="ch" y1="${T}" y2="${T + PH + GAP + VH}" stroke="#8C9096" stroke-width="1" style="display:none"/>
+    <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
+  const svg = el.firstChild, ch = svg.querySelector(".ch");
+  svg.addEventListener("pointermove", e => {
+    const r = svg.getBoundingClientRect(), i = Math.max(0, Math.min(n - 1, Math.round((e.clientX - r.left - L) / (W - L - R) * n - .5)));
+    const x = cd[i], prev = i ? cd[i - 1][4] : null;
+    ch.setAttribute("x1", X(i)); ch.setAttribute("x2", X(i)); ch.style.display = "";
+    showTip(e, `${x[0].replace(/-/g, "/")}${prev ? `　<b>${sign((x[4] / prev - 1) * 100, 2, "%")}</b>` : ""}<br>開 ${fmt(x[1])}　高 ${fmt(x[2])}<br>低 ${fmt(x[3])}　收 <b>${fmt(x[4])}</b><br>量 ${fmt(x[5], 1)} 百萬股`);
+  });
+  svg.addEventListener("pointerleave", () => { ch.style.display = "none"; tip.style.display = "none"; });
+  $("legend").innerHTML = MAS.map(([, nm, col]) => `<span><i style="background:${col}"></i>${nm}</span>`).join("") +
+    `<span><i style="background:#DC2626;opacity:.6"></i>壓力</span><span><i style="background:#15803D;opacity:.6"></i>支撐</span><span>K 線：紅漲綠跌</span>`;
+}
+
+function drawMacd() {
+  const el = $("macd"), s = A.macd.series, n = s.length, W = Math.max(el.clientWidth, 240), H = 150, T = 8, B = 18, L = 4, R = 4;
+  const vals = s.flatMap(p => [p[1], p[2], p[3], 0]);
+  let lo = Math.min(...vals), hi = Math.max(...vals); const pad = (hi - lo) * .06; lo -= pad; hi += pad;
+  const X = i => L + (W - L - R) * (i + .5) / n, Y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+  const bw = Math.max(2, (W - L - R) / n * .6);
+  let g = `<line x1="${L}" x2="${W - R}" y1="${Y(0)}" y2="${Y(0)}" stroke="#8C9096" stroke-width="1"/>`;
+  s.forEach((p, i) => { g += `<rect x="${(X(i) - bw / 2).toFixed(1)}" y="${Math.min(Y(p[3]), Y(0)).toFixed(1)}" width="${bw.toFixed(1)}" height="${Math.max(1, Math.abs(Y(p[3]) - Y(0))).toFixed(1)}" fill="${p[3] >= 0 ? "var(--up)" : "var(--dn)"}" opacity=".55"/>`; });
+  const path = k => s.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p[k]).toFixed(1)).join("");
+  g += `<path d="${path(1)}" fill="none" stroke="var(--chart)" stroke-width="1.8"/><path d="${path(2)}" fill="none" stroke="#F59E0B" stroke-width="1.8"/>`;
+  [0, Math.floor((n - 1) / 2), n - 1].forEach((i, k) => { g += `<text x="${X(i)}" y="${H - 4}" font-size="10.5" fill="#6B7178" text-anchor="${["start", "middle", "end"][k]}">${short(s[i][0])}</text>`; });
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="MACD"><g>${g}</g><line class="ch" y1="${T}" y2="${H - B}" stroke="#8C9096" style="display:none"/><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
+  const svg = el.firstChild, ch = svg.querySelector(".ch");
+  svg.addEventListener("pointermove", e => {
+    const r = svg.getBoundingClientRect(), i = Math.max(0, Math.min(n - 1, Math.round((e.clientX - r.left - L) / (W - L - R) * n - .5))), p = s[i];
+    ch.setAttribute("x1", X(i)); ch.setAttribute("x2", X(i)); ch.style.display = "";
+    showTip(e, `${p[0].replace(/-/g, "/")}<br>MACD ${fmt(p[1])}　信號 ${fmt(p[2])}<br>柱狀圖 <b>${sign(p[3])}</b>`);
+  });
+  svg.addEventListener("pointerleave", () => { ch.style.display = "none"; tip.style.display = "none"; });
+}
+
+function render() {
+  const q = A.quote, sw = A.swing, v = A.volume, m = A.macd, cur = q.close;
+  $("sub").textContent = `Advanced Micro Devices（AMD）　｜　資料日：${q.date.replace(/-/g, "/")}　｜　資料更新：${A.updated}（台灣時間）`;
+  $("st").innerHTML = Object.entries(A.status).map(([k, s]) =>
+    `<span class="chip ${s.ok ? "" : "r"}" title="${s.err ? esc(s.err) : ""}">${k} ${s.ok ? "至" : "抓取失敗，沿用至"} ${short(s.asof)}</span>`).join("") +
+    `<span class="chip">價位地圖整理日 ${A.levelsAsof.replace(/-/g, "/")}</span>`;
+
+  const nx = sw.levels.find(l => !l.hit);
+  $("kpis").innerHTML = `
+    <div class="kpi"><div class="l">最新收盤${q.live ? '<span class="tag">盤中</span>' : ""}</div><div class="v">${fmt(q.close)}</div><div class="s"><span class="${cls(q.chg)}">${sign(q.chg, 2, "%")}</span>　開 ${fmt(q.open)}／高 ${fmt(q.high)}／低 ${fmt(q.low)}</div></div>
+    <div class="kpi"><div class="l">${q.ext ? q.ext.session + "報價" : "盤前盤後"}</div><div class="v">${q.ext ? fmt(q.ext.price) : "—"}</div><div class="s">${q.ext ? `<span class="${cls(q.ext.chg)}">${sign(q.ext.chg, 2, "%")}</span>　${twTime(q.ext.time)}（台灣）` : "目前沒有盤前盤後資料"}</div></div>
+    <div class="kpi"><div class="l">近 5 日漲幅</div><div class="v ${cls(A.stats.gain5)}">${sign(A.stats.gain5, 1, "%")}</div><div class="s">近 15 日 <span class="${cls(A.stats.gain15)}">${sign(A.stats.gain15, 1, "%")}</span>；距 60 日高 ${sign(A.stats.from60High, 1, "%")}</div></div>
+    <div class="kpi"><div class="l">距 ${short(sw.high.date)} 高點</div><div class="v ${cls(sw.fromHigh)}">${sign(sw.fromHigh, 1, "%")}</div><div class="s">高點 ${fmt(sw.high.v)}（盤中）</div></div>
+    <div class="kpi"><div class="l">距 ${short(sw.low.date)} 低點</div><div class="v ${cls(sw.fromLow)}">${sign(sw.fromLow, 1, "%")}</div><div class="s">低點 ${fmt(sw.low.v)}（盤中）；高到低 ${fmt(sw.drop, 1)}%</div></div>
+    <div class="kpi"><div class="l">量能狀態</div><div class="v">${v.state}</div><div class="s">10 日 ÷ 60 日 ${fmt(v.r60)}；÷ 250 日 ${fmt(v.r250)}</div></div>
+    <div class="kpi"><div class="l">MACD 柱狀圖</div><div class="v ${cls(m.hist)}">${sign(m.hist)}</div><div class="s">線 ${fmt(m.line)}／信號 ${fmt(m.signal)}${m.cross ? `；${short(m.cross.date)} ${m.cross.dir}` : ""}</div></div>`;
+
+  const pct = Math.max(0, Math.min(100, sw.retrace));
+  $("retrace").innerHTML = `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px"><b>回補進度 ${fmt(sw.retrace, 1)}%</b><small>從 ${short(sw.high.date)} 高點 ${fmt(sw.high.v)} 到 ${short(sw.low.date)} 低點 ${fmt(sw.low.v)} 之間，現價 ${fmt(cur)} 已回到哪裡</small></div>
+    <span class="rt"><i style="width:${pct}%"></i>${sw.levels.map(l => `<b style="left:${parseFloat(l.name)}%"></b>`).join("")}</span>
+    <div class="rtl">${sw.levels.map(l => `<span style="left:${parseFloat(l.name)}%">${l.name}</span>`).join("")}</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${sw.levels.map(l => `<span class="chip ${l.hit ? "g" : ""}">${l.name}　${fmt(l.v)}　${l.hit ? "已超過" : "未到，距 " + sign((l.v / cur - 1) * 100, 1, "%")}</span>`).join("")}</div>
+    <div class="notes" style="margin-top:8px"><p>[註]：回補位 = 低點 + 比例 ×（高點 − 低點）；38.2%、50%、61.8%、78.6% 是常用的回檔比例，不具預測力。高低點日期為手動設定（pipeline/amd.py）。</p></div>`;
+
+  drawChart();
+
+  // 價位地圖
+  const lv = [...A.levels].sort((a, b) => b.v - a.v);
+  let h = "", placed = false;
+  const curRow = `<tr class="curp"><td colspan="2">▶ 現價 ${fmt(cur)}</td><td class="n">—</td><td>${q.date.replace(/-/g, "/")} 收盤</td></tr>`;
+  lv.forEach(l => {
+    if (!placed && l.v < cur) { h += curRow; placed = true; }
+    h += `<tr><td><span class="chip ${l.cat === "壓力" ? "r" : "g"}">${l.cat}</span></td><td>${l.name}</td><td class="n ${cls(l.dist)}">${sign(l.dist, 1, "%")}</td><td>${esc(l.basis)}</td></tr>`;
+  });
+  if (!placed) h += curRow;
+  $("levels").innerHTML = h;
+  $("gaps").innerHTML = A.gaps.length ? `<table><thead><tr><th>方向</th><th class="n">缺口區間</th><th>形成</th><th class="n">距現價</th></tr></thead><tbody>${A.gaps.map(g => `<tr><td>${g.type}缺口</td><td class="n">${fmt(g.lo)}–${fmt(g.hi)}</td><td>${short(g.from)} → ${short(g.to)}</td><td class="n ${cls((g.hi / cur - 1))}">${sign((g.hi / cur - 1) * 100, 1, "%")}</td></tr>`).join("")}</tbody></table>` : '<span class="mu">目前沒有未回補的缺口</span>';
+
+  // 量能
+  $("vkpis").innerHTML = `
+    <div class="kpi"><div class="l">近 10 日均量</div><div class="v">${fmt(v.v10, 1)}</div><div class="s">百萬股</div></div>
+    <div class="kpi"><div class="l">近 60 日均量</div><div class="v">${fmt(v.v60, 1)}</div><div class="s">量縮門檻 ${fmt(v.lowThr, 1)}／量增門檻 ${fmt(v.highThr, 1)}（60 日 × 0.8／1.2，以目前均量計）</div></div>
+    <div class="kpi"><div class="l">近 250 日均量</div><div class="v">${fmt(v.v250, 1)}</div><div class="s">一年基準</div></div>
+    <div class="kpi"><div class="l">10 日 ÷ 60 日</div><div class="v ${ratioCls(v.r60)}">${fmt(v.r60)}</div><div class="s">${v.state}（≥1.2 量增、≤0.8 量縮）</div></div>
+    <div class="kpi"><div class="l">10 日 ÷ 250 日</div><div class="v ${ratioCls(v.r250)}">${fmt(v.r250)}</div><div class="s">一年基準的比值</div></div>`;
+  $("vdays").innerHTML = [...v.days].reverse().map(d => `<tr><td>${short(d.d)}</td><td class="n ${cls(d.chg)}">${sign(d.chg, 2, "%")}</td><td class="n">${fmt(d.v, 1)}</td><td class="n ${ratioCls(d.vr)}">${fmt(d.vr)} 倍</td></tr>`).join("");
+  const vmax = Math.max(...A.vbp.bins.map(b => b.v));
+  $("vbpt").textContent = `量價分布（${A.vbp.start.replace(/-/g, "/")} 起，合計 ${fmt(A.vbp.total, 2)} 億股）`;
+  $("vbp").innerHTML = A.vbp.bins.map(b => `<div class="vb ${cur >= b.lo && cur < b.hi ? "cur" : ""}"><span>${b.lo}–${b.hi}</span><span class="t"><i style="width:${b.v / vmax * 100}%"></i></span><span class="r">${fmt(b.v, 2)} 億・${fmt(b.pct, 1)}%</span></div>`).join("");
+
+  // 均線與 MACD
+  $("mas").innerHTML = A.mas.map(x => `<tr><td>${x.name}</td><td class="n">${fmt(x.v)}</td><td class="n ${cls(x.d5)}">${sign(x.d5)}</td><td class="n ${cls(x.bias)}">${sign(x.bias, 1, "%")}</td><td class="n">${x.above ? x.streak + " 天" : '<span class="warn">跌破</span>'}</td></tr>`).join("");
+  $("macdnum").innerHTML = `<div class="kpi"><div class="l">MACD 線</div><div class="v ${cls(m.line)}" style="font-size:18px">${fmt(m.line)}</div></div>
+    <div class="kpi"><div class="l">信號線</div><div class="v ${cls(m.signal)}" style="font-size:18px">${fmt(m.signal)}</div></div>
+    <div class="kpi"><div class="l">柱狀圖</div><div class="v ${cls(m.hist)}" style="font-size:18px">${sign(m.hist)}</div></div>`;
+  drawMacd();
+
+  // 板塊
+  const so = A.sox;
+  $("sox").innerHTML = so ? `
+    <div class="kpi"><div class="l">SOX 收盤（${short(so.date)}）</div><div class="v">${fmt(so.close)}</div><div class="s"><span class="${cls(so.chg)}">${sign(so.chg, 2, "%")}</span></div></div>
+    <div class="kpi"><div class="l">SOX 對均線</div><div class="v" style="font-size:16px">${[["SMA20", so.sma20], ["SMA50", so.sma50], ["SMA200", so.sma200]].map(([n, x]) => `${n} ${fmt(x, 0)} <span class="${so.close >= x ? "up" : "dn"}">${so.close >= x ? "站上" : "跌破"}</span>`).join("<br>")}</div></div>
+    <div class="kpi"><div class="l">${short(S.baseLow || A.swing.low.date)} 低點收盤起</div><div class="v" style="font-size:16px">AMD <span class="${cls(so.amdSinceLow)}">${sign(so.amdSinceLow, 1, "%")}</span><br>SOX <span class="${cls(so.sinceLow)}">${sign(so.sinceLow, 1, "%")}</span></div><div class="s">差 ${sign(so.amdSinceLow - so.sinceLow, 1, " 個百分點")}</div></div>` : '<span class="mu">SOX 資料暫無</span>';
+}
+
+function renderStatic() {
+  const base = S.base;
+  $("scsub").textContent = `歷史上類似急漲之後怎麼走（固定快照，截至 ${S.asof.replace(/-/g, "/")}；套用起算價 ${fmt(base)}）`;
+  const rows = [["d5", "之後 5 日"], ["d10", "之後 10 日"], ["d20", "之後 20 日"], ["low", "20 日內最深低點"]];
+  const px = p => fmt(base * (1 + p / 100), 0);
+  const cell = (sc, k) => `<td class="n ${cls(sc.median[k])}">${sign(sc.median[k], 1, "%")} <small>平均 ${sign(sc.mean[k], 1, "%")}</small></td><td class="n"><b>${px(sc.median[k])}</b></td>`;
+  const [a, b] = S.scenarios;
+  $("sctb").innerHTML = `<thead><tr><th>項目</th><th class="n">${a.name}<br><small>${a.n} 次，中位數</small></th><th class="n">套到 ${fmt(base)}</th><th class="n">${b.name}<br><small>${b.n} 次，中位數</small></th><th class="n">套到 ${fmt(base)}</th></tr></thead>
+    <tbody>${rows.map(([k, nm]) => `<tr${k === "low" ? ' style="font-weight:600"' : ""}><td>${nm}</td>${cell(a, k)}${cell(b, k)}</tr>`).join("")}</tbody>`;
+  $("evs").innerHTML = S.events.map((e, i) => `<tr${i === 0 ? ' class="cur"' : ""}><td>${e.date}${i === 0 ? '<span class="tag">本次</span>' : ""}</td><td class="n up">${sign(e.gain5, 1, "%")}</td><td class="n">${fmt(e.base)} → ${fmt(e.end)}</td><td class="n dn">${sign(e.drop, 1, "%")}</td><td class="n">${e.recovery}%</td>
+    ${e.after ? e.after.map(x => `<td class="n ${cls(x)}">${sign(x, 1, "%")}</td>`).join("") : '<td class="n mu" colspan="3">尚無後續資料</td>'}<td>${esc(e.summary)}</td></tr>`).join("");
+  $("vcmp").innerHTML = S.volCompare.map(r => `<tr><td>${r.k}</td><td class="n"><b>${fmt(r.now)}</b></td><td class="n">${fmt(r.hist)}</td><td class="n">${fmt(r.s1)}</td><td class="n">${fmt(r.s2)}</td></tr>`).join("");
+  $("vsim").innerHTML = S.volSimilar.map(r => `<tr><td>${r.date}</td><td class="n dn">${sign(r.drop, 1, "%")}</td><td class="n">${fmt(r.cap)} 倍</td>${r.after.map(x => `<td class="n ${cls(x)}">${sign(x, 1, "%")}</td>`).join("")}<td class="n dn">${sign(r.low, 1, "%")}</td></tr>`).join("") +
+    S.volGroups.map(g => `<tr class="mu"><td colspan="3">${g.name}</td>${g.after.map(x => `<td class="n ${cls(x)}">${sign(x, 1, "%")}</td>`).join("")}<td class="n dn">${sign(g.low, 1, "%")}</td></tr>`).join("");
+  $("scnotes").innerHTML = `
+    <p>[註1]：${S.scenarios[0].name}：${S.scenarios[0].def}；${S.scenarios[1].name}：${S.scenarios[1].def}。</p>
+    <p>[註2]：價格 = ${fmt(base)}（2026/11/12 收盤）×（1 + 漲跌幅）；20 日內最深低點出現的時間點不固定；欄內小字為平均數。</p>
+    <p>[註3]：事件表為 2017 年起 5 日漲幅 ≥ 23.7% 的事件，每波取漲幅最大那天；「急漲前跌幅」為前高到低點的盤中跌幅，「回補比例」超過 100% 代表結束日收盤已高於前高。事件原因來自新聞報導，部分日期只有單一來源或未查到原因。</p>
+    <p>[註4]：量能基準為低點前第 6 天為止的 20 日平均量；低點日量能取低點前一天、當天、後一天的最大成交量；反彈各日為低點之後到結束日的每一天。</p>
+    <p>[註5]：「量能最像這次的五次」指低點日量能 ≥ 1.75 倍基準的事件；這次的低點日量能為 3.65 倍，是樣本中最大。反彈平均量不到低點日量九成的 3 次（2018/11/27、2022/6/2、2025/5/14）之後 20 日平均 −16.1%、最深低點平均 −21.8%，但只有 3 筆。</p>
+    <p>[註6]：樣本少、事件有重疊（2026 年就有三筆），統計只描述歷史，不具預測力。</p>`;
+}
+
+Promise.all([
+  fetch("data/amd.json", {cache: "no-store"}).then(r => r.json()),
+  fetch("data/amd_static.json", {cache: "no-store"}).then(r => r.json())
+]).then(([a, s]) => {
+  A = a; S = s;
+  render(); renderStatic();
+  let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { drawChart(); drawMacd(); }, 150); });
+}).catch(e => { $("sub").innerHTML = `<span class="warn">資料讀取失敗：${e}</span>`; console.error(e); });
+</script>
+</body>
+</html>

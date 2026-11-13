@@ -59,6 +59,7 @@
   .st{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;}
   .two{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
   .warn{color:#C02323;}
+  .nav{margin-top:8px;} .nav a{color:var(--accent);text-decoration:none;font-size:13px;} .nav a:hover{text-decoration:underline;}
   /* 每日訊號：點一列展開近 10 個交易日 */
   tr.tg{cursor:pointer;}
   tr.tg .name::before{content:"▸";display:inline-block;width:14px;color:var(--muted);font-size:11px;}
@@ -120,6 +121,7 @@
     <h1>大盤監控</h1>
     <p class="sub" id="sub">讀取中…</p>
     <div class="st" id="st"></div>
+    <div class="nav"><a href="amd.html">子頁：AMD 監控 →</a></div>
   </header>
 
   <section class="card">
