@@ -70,6 +70,12 @@
   .vb.cur .t i{background:var(--accent);opacity:1;}
   .vb.cur{font-weight:600;}
   .vb .r{text-align:right;}
+  .sw{margin-left:auto;display:inline-flex;align-items:center;gap:8px;font:inherit;font-size:13.5px;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:999px;padding:4px 14px 4px 6px;cursor:pointer;}
+  .sw i{width:34px;height:20px;border-radius:10px;background:#C9CDD2;position:relative;transition:background .15s;}
+  .sw i::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .15s;}
+  .sw.on i{background:var(--chart);} .sw.on i::after{left:16px;}
+  .lg{cursor:pointer;user-select:none;display:inline-flex;align-items:center;}
+  .lg.off{opacity:.38;text-decoration:line-through;}
 </style>
 </head>
 <body>
@@ -94,6 +100,19 @@
     <div class="notes">
       <p>[註]：下方量柱為當日成交量（百萬股），紅柱代表當日收盤高於前一日、綠柱代表低於前一日；最左邊是低點當天的全日成交量。</p>
       <p>[註]：MACD 為收盤價 EMA12 − EMA26，信號線為其 9 日 EMA，柱 = MACD − 信號；數值以含低點之前的完整日線計算，柱上數字為柱值。</p>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="head"><h2>後續走勢情境</h2><span>日收盤價；虛線為 11/12 收盤起的三種情境示意路徑</span>
+      <button class="sw on" id="scsw" type="button" aria-pressed="true"><i></i><b>情境模擬：開</b></button></div>
+    <div id="scchart" style="width:100%"></div>
+    <div class="legend" id="sclegend"></div>
+    <div class="notes">
+      <p>[註1]：虛線是依關鍵價位手繪的示意路徑，不是模型預測；轉折的日期與幅度沒有意義，只表示方向與目標價位。</p>
+      <p>[註2]：高、中、低概率為主觀判斷的相對排序，沒有對應的數字機率。</p>
+      <p>[註3]：突破以正常盤收盤站上 600 為準；跌破 560 後下看 520 支撐位，520 之下第二層支撐為 500。</p>
+      <p>[註4]：實線為每日收盤（Yahoo Finance），隨資料更新延伸，可直接對照情境走得準不準；情境起點固定為 11/12 收盤 585.30。可用右上角開關或點圖例，隱藏全部或個別情境。</p>
     </div>
   </section>
 
@@ -189,7 +208,7 @@ const short = d => d ? d.slice(5).replace("-", "/") : "—";
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const twTime = t => t ? new Date(t * 1000).toLocaleString("zh-TW", {timeZone: "Asia/Taipei", month: "numeric", day: "numeric", hour: "2-digit", minute: "2-digit", hour12: false}) : "—";
 const ratioCls = v => v >= 1.2 ? "up" : v <= 0.8 ? "dn" : "";
-let A, S;
+let A, S, SC;
 
 function showTip(e, html) {
   tip.innerHTML = html; tip.style.display = "block";
@@ -392,6 +411,55 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span><span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}`;
 }
 
+// 後續走勢情境：實線＝每日收盤（9/1 起，隨資料延伸）；虛線＝自情境起點（固定日）出發的三條示意路徑，可整體或個別開關
+const SC_ON = {all: true, mid: true, high: true, low: true};
+function drawScenario() {
+  const el = $("scchart"), C = SC, W = Math.max(el.clientWidth, 280), narrow = W < 640;
+  const act = A.chart.candles.filter(c => c[0] >= C.start).map(c => [c[0], c[4]]);
+  const dates = [...new Set([...act.map(p => p[0]), C.anchorDate, ...C.days])].sort(), n = dates.length, ix = Object.fromEntries(dates.map((d, i) => [d, i]));
+  const L = 48, R = narrow ? 84 : 360, T = 34, PH = narrow ? 300 : 400, B = 40, H = T + PH + B, pw = (W - L - R) / (n - 1);
+  const all = [...act.map(p => p[1]), ...C.scenarios.flatMap(s => s.path), ...C.levels.map(l => l[0])];
+  const lo = Math.floor(Math.min(...all) / 40) * 40, hi = Math.ceil(Math.max(...all) / 40) * 40;
+  const X = i => L + pw * i, Y = v => T + PH * (1 - (v - lo) / (hi - lo));
+  const on = SC_ON.all, ax = X(ix[C.anchorDate]), ay = Y(C.anchor), ex = X(ix[C.days[C.days.length - 1]]);
+  let g = "";
+  for (let p = lo; p <= hi; p += 40) g += `<line x1="${L}" x2="${W - R}" y1="${Y(p)}" y2="${Y(p)}" stroke="#EEEDE8"/><text x="${L - 6}" y="${Y(p) + 3.5}" font-size="10.5" fill="#9AA0A6" text-anchor="end">${p}</text>`;
+  g += `<line x1="${L}" x2="${L}" y1="${T}" y2="${T + PH}" stroke="#8C9096"/><line x1="${L}" x2="${W - R}" y1="${T + PH}" y2="${T + PH}" stroke="#8C9096"/>`;
+  const step = Math.max(1, Math.ceil(52 / pw)), ax0 = X(ix[C.anchorDate]);
+  dates.forEach((d, i) => { if ((i % step === 0 && Math.abs(X(i) - ax0) >= 46 && Math.abs(X(i) - X(n - 1)) >= 46) || d === C.anchorDate || i === n - 1) g += `<line x1="${X(i)}" x2="${X(i)}" y1="${T + PH}" y2="${T + PH + 4}" stroke="#8C9096"/><text x="${X(i)}" y="${T + PH + 17}" font-size="10.5" fill="#6B7178" text-anchor="middle">${short(d)}</text>`; });
+  if (on) {
+    g += `<line x1="${ax}" x2="${ax}" y1="${T - 8}" y2="${T + PH}" stroke="#8C9096" stroke-dasharray="2 3"/>
+      <text x="${ax - 8}" y="${T - 14}" font-size="11" fill="#8C9096" text-anchor="end">歷史走勢</text><text x="${ax + 8}" y="${T - 14}" font-size="11" fill="#8C9096">情境模擬（示意）</text>`;
+    C.levels.forEach(l => { g += `<line x1="${L}" x2="${W - R}" y1="${Y(l[0])}" y2="${Y(l[0])}" stroke="#B9BDC2"/>
+      <text x="${W - 6}" y="${Y(l[0]) + 3.5}" font-size="11" fill="#8C9096" text-anchor="end">${l[0]}${narrow ? "" : "　" + l[1]}</text>`; });
+    C.scenarios.forEach(s => {
+      if (!SC_ON[s.key]) return;
+      const pts = [[ax, ay], ...s.path.map((v, k) => [X(ix[C.days[k]]), Y(v)])], last = pts[pts.length - 1];
+      if (s.band) g += `<rect x="${ax}" y="${Y(s.band[1])}" width="${ex - ax}" height="${Y(s.band[0]) - Y(s.band[1])}" fill="${s.color}" opacity=".1"/>`;
+      g += `<path d="${pts.map((p, k) => (k ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("")}" fill="none" stroke="${s.color}" stroke-width="2.6" stroke-dasharray="7 5" stroke-linejoin="round"/><circle cx="${last[0]}" cy="${last[1]}" r="4.5" fill="${s.color}"/>`;
+      const by = last[1] + (narrow ? s.dy * .6 : s.dy), bx = last[0] + 14, bw = narrow ? 54 : 62;
+      g += `<line x1="${last[0]}" y1="${last[1]}" x2="${bx}" y2="${by}" stroke="${s.color}" stroke-width="1"/><rect x="${bx}" y="${by - 12}" width="${bw}" height="24" rx="6" fill="${s.color}"/><text x="${bx + bw / 2}" y="${by + 5}" font-size="12.5" font-weight="700" fill="#fff" text-anchor="middle">${s.tag}</text>`;
+      if (!narrow) g += s.text.map((t, k) => `<text x="${bx + bw + 10}" y="${by + 5 + (k - (s.text.length - 1) / 2) * 19}" font-size="14" font-weight="600" fill="#22262B">${t}</text>`).join("");
+    });
+  }
+  const path = act.map((p, k) => (k ? "L" : "M") + X(ix[p[0]]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join("");
+  const lastA = act[act.length - 1];
+  g += `<path d="${path}" fill="none" stroke="#22262B" stroke-width="2.4" stroke-linejoin="round"/><circle cx="${X(ix[lastA[0]])}" cy="${Y(lastA[1])}" r="5" fill="#22262B"/>
+    <text x="${X(ix[lastA[0]]) - 8}" y="${Y(lastA[1]) - 10}" font-size="12" fill="#22262B" text-anchor="end">收盤 ${fmt(lastA[1])}</text><g id="schov"></g>`;
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="AMD 後續走勢三種情境">${g}<rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
+  const svg = el.firstChild, hov = svg.querySelector("#schov");
+  svg.addEventListener("pointermove", e => {
+    const r = svg.getBoundingClientRect(), x = e.clientX - r.left, i = act.reduce((b, p, k) => Math.abs(X(ix[p[0]]) - x) < Math.abs(X(ix[act[b][0]]) - x) ? k : b, 0), p = act[i];
+    if (Math.abs(X(ix[p[0]]) - x) > 14) { hov.innerHTML = ""; tip.style.display = "none"; return; }
+    hov.innerHTML = `<circle cx="${X(ix[p[0]])}" cy="${Y(p[1])}" r="6" fill="none" stroke="#B04A2F" stroke-width="2"/>`;
+    showTip(e, `${short(p[0])}　收盤 <b>${fmt(p[1])}</b>${i ? `　<span style="opacity:.8">${sign((p[1] / act[i - 1][1] - 1) * 100, 2, "%")}</span>` : ""}`);
+  });
+  svg.addEventListener("pointerleave", () => { hov.innerHTML = ""; tip.style.display = "none"; });
+  $("sclegend").innerHTML = `<span><i style="background:#22262B;height:3px"></i>實際收盤價</span>` + C.scenarios.map(s => `<span class="lg ${SC_ON[s.key] && on ? "" : "off"}" data-k="${s.key}"><i style="background:${s.color};height:0;border-top:3px dashed ${s.color}"></i>${s.legend}</span>`).join("");
+  $("sclegend").querySelectorAll(".lg").forEach(b => b.onclick = () => { if (!SC_ON.all) { SC_ON.all = true; syncSw(); } SC_ON[b.dataset.k] = !SC_ON[b.dataset.k]; drawScenario(); });
+}
+function syncSw() { const b = $("scsw"); b.classList.toggle("on", SC_ON.all); b.setAttribute("aria-pressed", SC_ON.all); b.lastChild.textContent = "情境模擬：" + (SC_ON.all ? "開" : "關"); }
+
 function drawMacd() {
   const el = $("macd"), s = A.macd.series, n = s.length, W = Math.max(el.clientWidth, 240), H = 150, T = 8, B = 18, L = 4, R = 4;
   const vals = s.flatMap(p => [p[1], p[2], p[3], 0]);
@@ -504,11 +572,13 @@ function renderStatic() {
 
 Promise.all([
   fetch("data/amd.json", {cache: "no-store"}).then(r => r.json()),
-  fetch("data/amd_static.json", {cache: "no-store"}).then(r => r.json())
-]).then(([a, s]) => {
-  A = a; S = s;
-  render(); renderStatic();
-  let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { drawRetrace(); drawChart(); drawMacd(); }, 150); });
+  fetch("data/amd_static.json", {cache: "no-store"}).then(r => r.json()),
+  fetch("data/amd_scenario.json", {cache: "no-store"}).then(r => r.json())
+]).then(([a, s, sc]) => {
+  A = a; S = s; SC = sc;
+  render(); renderStatic(); drawScenario();
+  $("scsw").onclick = () => { SC_ON.all = !SC_ON.all; syncSw(); drawScenario(); };
+  let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { drawRetrace(); drawScenario(); drawChart(); drawMacd(); }, 150); });
 }).catch(e => { $("sub").innerHTML = `<span class="warn">資料讀取失敗：${e}</span>`; console.error(e); });
 </script>
 </body>
