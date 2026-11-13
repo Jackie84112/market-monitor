@@ -125,6 +125,7 @@ def build():
     swing = {"high": {"date": hi_row["d"], "v": r2(hi)}, "low": {"date": lo_row["d"], "v": r2(lo)},
              "drop": r2((lo / hi - 1) * 100, 1), "retrace": r2((cur - lo) / (hi - lo) * 100, 1),
              "fromHigh": r2((cur / hi - 1) * 100, 1), "fromLow": r2((cur / lo - 1) * 100, 1),
+             "path": [[x["d"], r2(x["c"])] for x in rows if x["d"] > SWING_LOW_DATE],   # 低點之後每日收盤，供「回補走勢」圖
              "levels": [{"name": f"{p * 100:.1f}%", "v": r2(lo + p * (hi - lo)), "hit": cur >= lo + p * (hi - lo)} for p in RETRACE]}
 
     # ---- 均線與乖離

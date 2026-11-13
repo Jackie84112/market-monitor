@@ -88,6 +88,17 @@
   </section>
 
   <section class="card">
+    <div class="head"><h2>回補走勢</h2><span>以低點為原點，之後每日收盤；點折線上的點可標出該日的回補水位</span></div>
+    <div id="rchart" style="width:100%"></div>
+    <div class="legend" id="rlegend"></div>
+    <div class="notes">
+      <p>[註1]：原點是低點日的盤中最低價（不是收盤價），之後每個點是當日收盤價；縱軸涵蓋整個 100% 回補區間：0% ＝ 低點，100% ＝ 高點。</p>
+      <p>[註2]：回補水位 ＝（價格 − 低點）÷（高點 − 低點）；38.2%、50%、61.8% 是常用的回檔比例，不具預測力。</p>
+      <p>[註3]：橫軸只放交易日（不含休市日），圖右側留白給之後的交易日；點折線上的點標出回補水位，再點一次取消。</p>
+    </div>
+  </section>
+
+  <section class="card">
     <div class="head"><h2>走勢與關鍵價位</h2><span>近 100 個交易日 K 線、均線與支撐壓力；量柱在下方</span></div>
     <div id="chart" style="width:100%"></div>
     <div class="legend" id="legend"></div>
@@ -255,6 +266,92 @@ function drawChart() {
     `<span><i style="background:#DC2626;opacity:.6"></i>壓力</span><span><i style="background:#15803D;opacity:.6"></i>支撐</span><span>K 線：紅漲綠跌</span>`;
 }
 
+// 回補走勢：原點＝低點日最低價，Y 軸涵蓋 0%（低點）到 100%（高點），點折線上的點標出回補水位
+const PINS = new Set();
+function drawRetrace() {
+  const el = $("rchart"), sw = A.swing, lo = sw.low.v, hi = sw.high.v, span = hi - lo;
+  const pts = [[sw.low.date, lo], ...(sw.path || [])], n = pts.length;
+  const W = Math.max(el.clientWidth, 280), narrow = W < 560;
+  const L = 54, R = narrow ? 94 : 132, T = 16, B = 34, H = narrow ? 340 : 420;
+  const slots = Math.max(n, 8), pw = (W - L - R) / (slots - 1);
+  const X = i => L + pw * i, Y = v => T + (H - T - B) * (1 - (v - lo) / span), pc = v => (v - lo) / span * 100;
+  const fixed = sw.levels.slice(0, 3);
+  const ACC = "#B04A2F";
+  let g = "";
+  for (let p = Math.ceil(lo / 50) * 50; p < hi; p += 50) {
+    if (Y(lo) - Y(p) < 16 || Y(p) - Y(hi) < 16) continue;   // 離高低點標籤太近就略過，避免文字重疊
+    g += `<line x1="${L}" x2="${W - R}" y1="${Y(p)}" y2="${Y(p)}" stroke="#EEEDE8" stroke-width="1"/><text x="${L - 6}" y="${Y(p) + 3.5}" font-size="10.5" fill="#9AA0A6" text-anchor="end">${p}</text>`;
+  }
+  // 0% / 100% 邊界與座標軸
+  g += `<line x1="${L}" x2="${W - R}" y1="${Y(hi)}" y2="${Y(hi)}" stroke="#B9BDC2" stroke-width="1"/>
+    <line x1="${L}" x2="${L}" y1="${T}" y2="${H - B}" stroke="#8C9096" stroke-width="1"/>
+    <line x1="${L}" x2="${W - R}" y1="${H - B}" y2="${H - B}" stroke="#8C9096" stroke-width="1"/>
+    <text x="${L - 6}" y="${Y(hi) + 3.5}" font-size="10.5" fill="#22262B" font-weight="600" text-anchor="end">${fmt(hi, 0)}</text>
+    <text x="${L - 6}" y="${H - B + 3.5}" font-size="10.5" fill="#22262B" font-weight="600" text-anchor="end">${fmt(lo, 0)}</text>
+    <text x="${W - R + 6}" y="${Y(hi) + 3.5}" font-size="10.5" fill="#22262B" font-weight="600">100%　${fmt(hi)}</text>
+    <text x="${W - R + 6}" y="${H - B + 3.5}" font-size="10.5" fill="#22262B" font-weight="600">0%　${fmt(lo)}</text>`;
+  fixed.forEach(l => {
+    g += `<line x1="${L}" x2="${W - R}" y1="${Y(l.v)}" y2="${Y(l.v)}" stroke="#6B7178" stroke-width="1.2" stroke-dasharray="6 4"/>
+      <text x="${W - R + 6}" y="${Y(l.v) + 3.5}" font-size="10.5" fill="#4B5158">${l.name}　${fmt(l.v)}</text>`;
+  });
+  // X 軸：每個交易日一格，標籤太擠就隔幾格標一次
+  const step = Math.max(1, Math.ceil(46 / pw));
+  pts.forEach((p, i) => {
+    g += `<line x1="${X(i)}" x2="${X(i)}" y1="${H - B}" y2="${H - B + 4}" stroke="#8C9096"/>`;
+    if (i % step === 0 || i === n - 1) g += `<text x="${X(i)}" y="${H - 14}" font-size="10.5" fill="#6B7178" text-anchor="middle">${short(p[0])}</text>`;
+  });
+  g += `<text x="${(L + W - R) / 2}" y="${H - 2}" font-size="10.5" fill="#9AA0A6" text-anchor="middle">交易日</text>`;
+  // 折線與點
+  const path = pts.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p[1]).toFixed(1)).join("");
+  g += `<path d="${path}" fill="none" stroke="var(--chart)" stroke-width="2.2" stroke-linejoin="round"/>`;
+  pts.forEach((p, i) => {
+    g += i === 0
+      ? `<circle cx="${X(0)}" cy="${Y(p[1])}" r="5" fill="#fff" stroke="var(--chart)" stroke-width="2"/>`
+      : `<circle cx="${X(i)}" cy="${Y(p[1])}" r="${i === n - 1 ? 5.5 : 4}" fill="var(--chart)" stroke="#fff" stroke-width="1.5"/>`;
+  });
+  const lastP = pts[n - 1];
+  g += `<text x="${X(0) + 9}" y="${Y(lo) - 9}" font-size="11" fill="#22262B">原點：${short(sw.low.date)} 最低 ${fmt(lo)}</text>`;
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="AMD 回補走勢圖">${g}<g id="rpins"></g><g id="rhov"></g><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
+  const svg = el.firstChild, pins = svg.querySelector("#rpins"), hov = svg.querySelector("#rhov");
+  const drawPins = () => {
+    // 最新一點的數字標籤（被標記時改由標記線顯示，避免文字疊在一起）
+    const lastLab = n > 1 && !PINS.has(lastP[0])
+      ? `<text x="${X(n - 1)}" y="${Y(lastP[1]) - 11}" font-size="11.5" fill="#22262B" font-weight="600" text-anchor="${n - 1 > slots - 3 ? "end" : "middle"}" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${fmt(lastP[1])}｜${fmt(pc(lastP[1]), 1)}%</text>` : "";
+    pins.innerHTML = lastLab + [...PINS].map(d => pts.findIndex(p => p[0] === d)).filter(i => i >= 0).map(i => {
+      const y = Y(pts[i][1]), txt = narrow ? `回補 ${fmt(pc(pts[i][1]), 1)}%` : `${short(pts[i][0])} 收 ${fmt(pts[i][1])}｜回補 ${fmt(pc(pts[i][1]), 1)}%`;
+      return `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="${ACC}" stroke-width="1.5" stroke-dasharray="3 3"/>
+        <circle cx="${X(i)}" cy="${y}" r="7" fill="none" stroke="${ACC}" stroke-width="2"/>
+        <text x="${W - R - 6}" y="${y - 7}" font-size="11.5" font-weight="600" fill="${ACC}" text-anchor="end" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${txt}</text>`;
+    }).join("");
+    $("rlegend").innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span><span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>點選標記的回補位</span>` +
+      (PINS.size ? `<span class="chip" id="rclear" style="cursor:pointer">清除標記</span>` : `<span>點折線上的點，標出該日回補水位</span>`);
+    const c = $("rclear"); if (c) c.onclick = () => { PINS.clear(); drawPins(); };
+  };
+  const near = e => {
+    const r = svg.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top;
+    const i = Math.round((x - L) / pw);
+    if (i < 0 || i > n - 1) return -1;
+    return Math.hypot(x - X(i), y - Y(pts[i][1])) <= 22 ? i : -1;
+  };
+  svg.addEventListener("pointermove", e => {
+    const i = near(e);
+    svg.style.cursor = i >= 0 ? "pointer" : "default";
+    if (i < 0) { hov.innerHTML = ""; tip.style.display = "none"; return; }
+    const p = pts[i], pr = pc(p[1]);
+    hov.innerHTML = `<circle cx="${X(i)}" cy="${Y(p[1])}" r="8" fill="none" stroke="var(--chart)" stroke-width="2" opacity=".6"/>`;
+    showTip(e, `${p[0].replace(/-/g, "/")}${i ? " 收盤" : " 最低"} <b>${fmt(p[1])}</b><br>回補水位 <b>${fmt(pr, 1)}%</b>${i && PINS.has(p[0]) ? "（已標記）" : ""}<br>${i ? "點一下標出／取消回補水位" : "原點（0%）"}`);
+  });
+  svg.addEventListener("pointerleave", () => { hov.innerHTML = ""; tip.style.display = "none"; });
+  svg.addEventListener("click", e => {
+    const i = near(e);
+    if (i < 1) return;
+    const d = pts[i][0];
+    PINS.has(d) ? PINS.delete(d) : PINS.add(d);
+    drawPins();
+  });
+  drawPins();
+}
+
 function drawMacd() {
   const el = $("macd"), s = A.macd.series, n = s.length, W = Math.max(el.clientWidth, 240), H = 150, T = 8, B = 18, L = 4, R = 4;
   const vals = s.flatMap(p => [p[1], p[2], p[3], 0]);
@@ -300,6 +397,7 @@ function render() {
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${sw.levels.map(l => `<span class="chip ${l.hit ? "g" : ""}">${l.name}　${fmt(l.v)}　${l.hit ? "已超過" : "未到，距 " + sign((l.v / cur - 1) * 100, 1, "%")}</span>`).join("")}</div>
     <div class="notes" style="margin-top:8px"><p>[註]：回補位 = 低點 + 比例 ×（高點 − 低點）；38.2%、50%、61.8%、78.6% 是常用的回檔比例，不具預測力。高低點日期為手動設定（pipeline/amd.py）。</p></div>`;
 
+  drawRetrace();
   drawChart();
 
   // 價位地圖
@@ -370,7 +468,7 @@ Promise.all([
 ]).then(([a, s]) => {
   A = a; S = s;
   render(); renderStatic();
-  let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { drawChart(); drawMacd(); }, 150); });
+  let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(() => { drawRetrace(); drawChart(); drawMacd(); }, 150); });
 }).catch(e => { $("sub").innerHTML = `<span class="warn">資料讀取失敗：${e}</span>`; console.error(e); });
 </script>
 </body>
