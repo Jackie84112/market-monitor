@@ -122,10 +122,14 @@ def build():
     lo_row = next(x for x in rows if x["d"] == SWING_LOW_DATE)
     hi, lo = hi_row["h"], lo_row["l"]
     cur = last["c"]
+    lo_i = rows.index(lo_row)
     swing = {"high": {"date": hi_row["d"], "v": r2(hi)}, "low": {"date": lo_row["d"], "v": r2(lo)},
              "drop": r2((lo / hi - 1) * 100, 1), "retrace": r2((cur - lo) / (hi - lo) * 100, 1),
              "fromHigh": r2((cur / hi - 1) * 100, 1), "fromLow": r2((cur / lo - 1) * 100, 1),
-             "path": [[x["d"], r2(x["c"])] for x in rows if x["d"] > SWING_LOW_DATE],   # 低點之後每日收盤，供「回補走勢」圖
+             # 低點日的成交量（百萬股）與當日漲跌幅，供「回補走勢」圖下方的量柱
+             "lowVol": r2(V[lo_i], 1), "lowChg": r2((lo_row["c"] / rows[lo_i - 1]["c"] - 1) * 100),
+             # 低點之後每日 [日期, 收盤, 成交量（百萬股）, 當日漲跌幅 %]，供「回補走勢」圖
+             "path": [[x["d"], r2(x["c"]), r2(V[i], 1), r2((x["c"] / rows[i - 1]["c"] - 1) * 100)] for i, x in enumerate(rows) if x["d"] > SWING_LOW_DATE],
              "levels": [{"name": f"{p * 100:.1f}%", "v": r2(lo + p * (hi - lo)), "hit": cur >= lo + p * (hi - lo)} for p in RETRACE]}
 
     # ---- 均線與乖離
