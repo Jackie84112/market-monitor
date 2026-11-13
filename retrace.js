@@ -14,7 +14,8 @@ function drawRetrace() {
   const chgs = [sw.lowChg, ...path0.map(p => p[3])];
   const W = Math.max(el.clientWidth, 280), narrow = W < 560;
   const L = 54, R = narrow ? 94 : 132, T = 16, PH = narrow ? 270 : 340, DH = 34, VG = 8, VH = vols ? (narrow ? 78 : 92) : 0;
-  const VT = T + PH + DH + VG, H = vols ? VT + VH + 8 : T + PH + DH, bottom = T + PH;
+  const mac = sw.macd && sw.macd.length === n ? sw.macd : null, MG = 16, MH = mac ? (narrow ? 96 : 116) : 0;
+  const VT = T + PH + DH + VG, MT = VT + (vols ? VH : 0) + MG, H = (mac ? MT + MH : vols ? VT + VH : T + PH + DH) + 8, bottom = T + PH;
   const slots = Math.max(n, 8), pw = (W - L - R) / (slots - 1);
   const X = i => L + pw * i, Y = v => T + PH * (1 - (v - lo) / span), pc = v => (v - lo) / span * 100;
   const vmax = vols ? Math.max(...vols) : 1, vbase = VT + VH, vbh = VH - 16, vbw = Math.min(pw * .5, 36), barH = v => Math.max(1, vbh * v / vmax);
@@ -64,6 +65,22 @@ function drawRetrace() {
         <text x="${X(i)}" y="${vbase - h - 4}" font-size="10.5" fill="#4B5158" text-anchor="middle">${fmt(v, 1)}</text>`;
     });
   }
+  // MACD（12,26,9）：柱狀圖＝柱（紅正綠負）、MACD 線（藍）、信號線（橘），與上方的點對齊
+  if (mac) {
+    const mTop = MT + 16, mBot = MT + MH, mid = (mTop + mBot) / 2, mm = Math.max(...mac.flatMap(m => [Math.abs(m[1]), Math.abs(m[2]), Math.abs(m[3])])) * 1.25 || 1;
+    const MY = v => mid - v / mm * (mBot - mTop) / 2, mp = k => mac.map((m, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + MY(m[k]).toFixed(1)).join("");
+    g += `<text x="${W - R}" y="${MT + 8}" font-size="10" fill="#9AA0A6" text-anchor="end">MACD（12, 26, 9）</text>
+      <line x1="${L}" x2="${W - R}" y1="${mid}" y2="${mid}" stroke="#8C9096" stroke-width="1"/>
+      <text x="${W - R + 6}" y="${mid + 3.5}" font-size="10.5" fill="#9AA0A6">0</text>`;
+    mac.forEach((m, i) => {
+      const y = MY(m[3]), h = Math.max(1, Math.abs(y - mid)), up = m[3] >= 0;
+      g += `<rect x="${(X(i) - vbw / 2).toFixed(1)}" y="${(up ? y : mid).toFixed(1)}" width="${vbw.toFixed(1)}" height="${h.toFixed(1)}" rx="1.5" fill="${up ? "var(--up)" : "var(--dn)"}" opacity=".55"/>
+        <text x="${X(i)}" y="${up ? y - 4 : y + h + 11}" font-size="10" fill="#4B5158" text-anchor="middle">${fmt(m[3], dec)}</text>`;
+    });
+    g += `<path d="${mp(1)}" fill="none" stroke="var(--chart)" stroke-width="1.8" stroke-linejoin="round"/><path d="${mp(2)}" fill="none" stroke="#F59E0B" stroke-width="1.8" stroke-linejoin="round"/>`;
+    const last = mac[n - 1];
+    g += `<text x="${W - R + 6}" y="${MY(last[1]) + 3.5}" font-size="10.5" fill="var(--chart)">MACD　${fmt(last[1], dec)}</text><text x="${W - R + 6}" y="${MY(last[2]) + (Math.abs(MY(last[1]) - MY(last[2])) < 13 ? (last[2] < last[1] ? 14 : -6) : 3.5)}" font-size="10.5" fill="#D97706">信號　${fmt(last[2], dec)}</text>`;
+  }
   el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="${D.en} 回補走勢圖與每日成交量">${g}<g id="rhov"></g><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
   const svg = el.firstChild, hov = svg.querySelector("#rhov");
   // 滑鼠移到點上：該日回補水位的虛線＋浮標（浮標只有股價）；同一天的量柱加外框
@@ -87,7 +104,7 @@ function drawRetrace() {
   });
   svg.addEventListener("pointerdown", e => { const i = near(e); if (i >= 0) show(i); else hov.innerHTML = ""; });   // 觸控螢幕：點一下顯示
   svg.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") hov.innerHTML = ""; });
-  $("rlegend").innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span><span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vols ? "<span>量柱：紅漲綠跌</span>" : ""}`;
+  $("rlegend").innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span><span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}`;
 }
 
 function renderPage() {

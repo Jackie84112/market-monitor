@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from amd import daily, r2, RETRACE, TW  # noqa: E402
+from amd import daily, ema, r2, RETRACE, TW  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 STOCKS = [
@@ -30,9 +30,13 @@ def build(s):
     hi, lo = hi_row["h"], lo_row["l"]
     cur = rows[-1]["c"]
     li = rows.index(lo_row)
+    C = [x["c"] for x in rows]
+    line = [a - b for a, b in zip(ema(C, 12), ema(C, 26))]
+    sig = ema(line, 9)
+    macd = [[rows[i]["d"], r2(line[i]), r2(sig[i]), r2(line[i] - sig[i])] for i in range(li, len(rows))]
     swing = {"high": {"date": hi_row["d"], "v": r2(hi)}, "low": {"date": lo_row["d"], "v": r2(lo)},
              "drop": r2((lo / hi - 1) * 100, 1), "retrace": r2((cur - lo) / (hi - lo) * 100, 1),
-             "lowVol": r2(V[li], 1), "lowChg": r2((lo_row["c"] / rows[li - 1]["c"] - 1) * 100),
+             "macd": macd, "lowVol": r2(V[li], 1), "lowChg": r2((lo_row["c"] / rows[li - 1]["c"] - 1) * 100),
              "path": [[x["d"], r2(x["c"]), r2(V[i], 1), r2((x["c"] / rows[i - 1]["c"] - 1) * 100)] for i, x in enumerate(rows) if x["d"] > s["low"]],
              "levels": [{"name": f"{p * 100:.1f}%", "v": r2(lo + p * (hi - lo)), "hit": cur >= lo + p * (hi - lo)} for p in RETRACE]}
     return {"updated": dt.datetime.now(TW).strftime("%Y/%m/%d %H:%M"), "name": s["name"], "en": s["en"], "code": s["code"],

@@ -123,10 +123,13 @@ def build():
     hi, lo = hi_row["h"], lo_row["l"]
     cur = last["c"]
     lo_i = rows.index(lo_row)
+    _l = [a - b for a, b in zip(ema(C, 12), ema(C, 26))]
+    _s = ema(_l, 9)
     swing = {"high": {"date": hi_row["d"], "v": r2(hi)}, "low": {"date": lo_row["d"], "v": r2(lo)},
              "drop": r2((lo / hi - 1) * 100, 1), "retrace": r2((cur - lo) / (hi - lo) * 100, 1),
              "fromHigh": r2((cur / hi - 1) * 100, 1), "fromLow": r2((cur / lo - 1) * 100, 1),
              # 低點日的成交量（百萬股）與當日漲跌幅，供「回補走勢」圖下方的量柱
+             "macd": [[rows[i]["d"], r2(_l[i]), r2(_s[i]), r2(_l[i] - _s[i])] for i in range(lo_i, n)],
              "lowVol": r2(V[lo_i], 1), "lowChg": r2((lo_row["c"] / rows[lo_i - 1]["c"] - 1) * 100),
              # 低點之後每日 [日期, 收盤, 成交量（百萬股）, 當日漲跌幅 %]，供「回補走勢」圖
              "path": [[x["d"], r2(x["c"]), r2(V[i], 1), r2((x["c"] / rows[i - 1]["c"] - 1) * 100)] for i, x in enumerate(rows) if x["d"] > SWING_LOW_DATE],
