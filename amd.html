@@ -108,12 +108,6 @@
       <button class="sw on" id="scsw" type="button" aria-pressed="true"><i></i><b>情境模擬：開</b></button></div>
     <div id="scchart" style="width:100%"></div>
     <div class="legend" id="sclegend"></div>
-    <div class="notes">
-      <p>[註1]：虛線是依關鍵價位手繪的示意路徑，不是模型預測；轉折的日期與幅度沒有意義，只表示方向與目標價位。</p>
-      <p>[註2]：高、中、低概率為主觀判斷的相對排序，沒有對應的數字機率。</p>
-      <p>[註3]：突破以正常盤收盤站上 600 為準；跌破 560 後下看 520 支撐位，520 之下第二層支撐為 500。</p>
-      <p>[註4]：實線為每日收盤（Yahoo Finance），隨資料更新延伸，可直接對照情境走得準不準；情境起點固定為 11/12 收盤 585.30。可用右上角開關或點圖例，隱藏全部或個別情境。</p>
-    </div>
   </section>
 
   <section class="card">
@@ -417,7 +411,7 @@ function drawScenario() {
   const el = $("scchart"), C = SC, W = Math.max(el.clientWidth, 280), narrow = W < 640;
   const act = A.chart.candles.filter(c => c[0] >= C.start).map(c => [c[0], c[4]]);
   const dates = [...new Set([...act.map(p => p[0]), C.anchorDate, ...C.days])].sort(), n = dates.length, ix = Object.fromEntries(dates.map((d, i) => [d, i]));
-  const L = 48, R = narrow ? 84 : 360, T = 34, PH = narrow ? 300 : 400, B = 40, H = T + PH + B, pw = (W - L - R) / (n - 1);
+  const L = 48, R = narrow ? 72 : 250, T = 34, PH = narrow ? 300 : 400, B = 40, H = T + PH + B, pw = (W - L - R) / (n - 1);
   const all = [...act.map(p => p[1]), ...C.scenarios.flatMap(s => s.path), ...C.levels.map(l => l[0])];
   const lo = Math.floor(Math.min(...all) / 40) * 40, hi = Math.ceil(Math.max(...all) / 40) * 40;
   const X = i => L + pw * i, Y = v => T + PH * (1 - (v - lo) / (hi - lo));
@@ -430,8 +424,7 @@ function drawScenario() {
   if (on) {
     g += `<line x1="${ax}" x2="${ax}" y1="${T - 8}" y2="${T + PH}" stroke="#8C9096" stroke-dasharray="2 3"/>
       <text x="${ax - 8}" y="${T - 14}" font-size="11" fill="#8C9096" text-anchor="end">歷史走勢</text><text x="${ax + 8}" y="${T - 14}" font-size="11" fill="#8C9096">情境模擬（示意）</text>`;
-    C.levels.forEach(l => { g += `<line x1="${L}" x2="${W - R}" y1="${Y(l[0])}" y2="${Y(l[0])}" stroke="#B9BDC2"/>
-      <text x="${W - 6}" y="${Y(l[0]) + 3.5}" font-size="11" fill="#8C9096" text-anchor="end">${l[0]}${narrow ? "" : "　" + l[1]}</text>`; });
+    C.levels.forEach(l => { g += `<line x1="${L}" x2="${W - R}" y1="${Y(l[0])}" y2="${Y(l[0])}" stroke="#B9BDC2"/>`; });
     C.scenarios.forEach(s => {
       if (!SC_ON[s.key]) return;
       const pts = [[ax, ay], ...s.path.map((v, k) => [X(ix[C.days[k]]), Y(v)])], last = pts[pts.length - 1];
