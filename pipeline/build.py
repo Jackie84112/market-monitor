@@ -425,14 +425,36 @@ def main():
     series, live, mtime = old.get("series", {}), old.get("live", {}), old.get("mtime", {})
 
     fails, latest = [], {}
-    for key, sym, adj in [(k, s, k == "t0050") for k, _, s in INDICES + FUTURES + BOND_ETF] + [(k, s, False) for k, s in OTHER_YAHOO.items()]:
-        try:
-            series[key], live[key], mtime[key] = yahoo(sym, adj)
-            series[key] = series[key][-KEEP:]
-            latest[key] = series[key][-1][0]
-        except Exception as e:
-            fails.append(f"{sym}: {e}")
-        time.sleep(0.15)
+    ysyms = {k: (s, k == "t0050") for k, _, s in INDICES + FUTURES + BOND_ETF}
+    ysyms.update({k: (s, False) for k, s in OTHER_YAHOO.items()})
+
+    def fetch_yahoo(keys):
+        for key in keys:
+            sym, adj = ysyms[key]
+            try:
+                series[key], live[key], mtime[key] = yahoo(sym, adj)
+                series[key] = series[key][-KEEP:]
+                latest[key] = series[key][-1][0]
+                fails[:] = [f for f in fails if not f.startswith(sym + ":")]
+            except Exception as e:
+                fails.append(f"{sym}: {e}")
+            time.sleep(0.15)
+
+    fetch_yahoo(list(ysyms))
+    # Yahoo 各商品更新有先後：同市場內若有序列落後同組最新日，等一下重抓（最多 4 輪）。期貨與匯率 24 小時交易，不比對
+    groups = [["spx", "ndx", "sox", "dji", "vix", "vix3m", "spy", "rsp", "tsm"],
+              ["t0050", "t2330", "b00679", "b00687", "b00720", "b00937"]]
+    for attempt in range(4):
+        stale = []
+        for g in groups:
+            ds = [latest[k] for k in g if k in latest]
+            if ds:
+                stale += [k for k in g if k not in latest or latest[k] < max(ds)]
+        if not stale:
+            break
+        print(f"Yahoo 落後 {stale}，30 秒後重抓（第 {attempt + 1} 輪）", flush=True)
+        time.sleep(30)
+        fetch_yahoo(stale)
     note("Yahoo", not fails, max(latest.values(), default=None), "; ".join(fails) or None)
 
     try:
