@@ -18,6 +18,11 @@ ROOT = Path(__file__).resolve().parent.parent
 STOCKS = [
     {"key": "mediatek", "sym": "2454.TW", "name": "聯發科", "en": "MediaTek", "code": "2454", "high": "2026-10-06", "low": "2026-11-06", "dec": 0, "ccy": "TWD"},
     {"key": "avgo", "sym": "AVGO", "name": "博通", "en": "Broadcom", "code": "AVGO", "high": "2026-10-06", "low": "2026-11-06", "dec": 2, "ccy": "USD"},
+    # ETF 監控子頁（etf.html）四檔；低點日期手動設定（高點之後盤中最低價所在日）
+    {"key": "etf_0050", "sym": "0050.TW", "name": "元大台灣50", "en": "Yuanta Taiwan 50 ETF", "code": "0050", "high": "2026-10-06", "low": "2026-11-06", "dec": 2, "ccy": "TWD"},
+    {"key": "etf_soxx", "sym": "SOXX", "name": "iShares 半導體 ETF", "en": "iShares Semiconductor ETF", "code": "SOXX", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD"},
+    {"key": "etf_qqq", "sym": "QQQ", "name": "Invesco 那斯達克100 ETF", "en": "Invesco QQQ Trust", "code": "QQQ", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD"},
+    {"key": "etf_spy", "sym": "SPY", "name": "SPDR 標普500 ETF", "en": "SPDR S&P 500 ETF", "code": "SPY", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD"},
 ]
 
 
