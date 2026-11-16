@@ -19,10 +19,10 @@ STOCKS = [
     {"key": "mediatek", "sym": "2454.TW", "name": "聯發科", "en": "MediaTek", "code": "2454", "high": "2026-10-06", "low": "2026-11-06", "dec": 0, "ccy": "TWD"},
     {"key": "avgo", "sym": "AVGO", "name": "博通", "en": "Broadcom", "code": "AVGO", "high": "2026-10-06", "low": "2026-11-06", "dec": 2, "ccy": "USD"},
     # ETF 監控子頁（etf.html）四檔；低點日期手動設定（高點之後盤中最低價所在日）
-    {"key": "etf_0050", "sym": "0050.TW", "name": "元大台灣50", "en": "Yuanta Taiwan 50 ETF", "code": "0050", "high": "2026-10-06", "low": "2026-11-06", "dec": 2, "ccy": "TWD"},
-    {"key": "etf_soxx", "sym": "SOXX", "name": "iShares 半導體 ETF", "en": "iShares Semiconductor ETF", "code": "SOXX", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD"},
-    {"key": "etf_qqq", "sym": "QQQ", "name": "Invesco 那斯達克100 ETF", "en": "Invesco QQQ Trust", "code": "QQQ", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD"},
-    {"key": "etf_spy", "sym": "SPY", "name": "SPDR 標普500 ETF", "en": "SPDR S&P 500 ETF", "code": "SPY", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD"},
+    {"key": "etf_0050", "sym": "0050.TW", "name": "元大台灣50", "en": "Yuanta Taiwan 50 ETF", "code": "0050", "high": "2026-10-06", "low": "2026-11-06", "dec": 2, "ccy": "TWD", "close": True},
+    {"key": "etf_soxx", "sym": "SOXX", "name": "iShares 半導體 ETF", "en": "iShares Semiconductor ETF", "code": "SOXX", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True},
+    {"key": "etf_qqq", "sym": "QQQ", "name": "Invesco 那斯達克100 ETF", "en": "Invesco QQQ Trust", "code": "QQQ", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True},
+    {"key": "etf_spy", "sym": "SPY", "name": "SPDR 標普500 ETF", "en": "SPDR S&P 500 ETF", "code": "SPY", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True},
 ]
 
 
@@ -32,7 +32,7 @@ def build(s):
     V = [x["v"] / 1e6 for x in rows]
     hi_row = next(x for x in rows if x["d"] == s["high"])
     lo_row = next(x for x in rows if x["d"] == s["low"])
-    hi, lo = hi_row["h"], lo_row["l"]
+    hi, lo = (hi_row["c"], lo_row["c"]) if s.get("close") else (hi_row["h"], lo_row["l"])   # close=True：高低點用收盤價（ETF 子頁，與大盤頁一致）
     cur = rows[-1]["c"]
     li = rows.index(lo_row)
     C = [x["c"] for x in rows]
@@ -44,7 +44,7 @@ def build(s):
              "macd": macd, "lowVol": r2(V[li], 1), "lowChg": r2((lo_row["c"] / rows[li - 1]["c"] - 1) * 100),
              "path": [[x["d"], r2(x["c"]), r2(V[i], 1), r2((x["c"] / rows[i - 1]["c"] - 1) * 100)] for i, x in enumerate(rows) if x["d"] > s["low"]],
              "levels": [{"name": f"{p * 100:.1f}%", "v": r2(lo + p * (hi - lo)), "hit": cur >= lo + p * (hi - lo)} for p in RETRACE]}
-    return {"updated": dt.datetime.now(TW).strftime("%Y/%m/%d %H:%M"), "name": s["name"], "en": s["en"], "code": s["code"],
+    return {"lowWord": "收盤低" if s.get("close") else "最低", "updated": dt.datetime.now(TW).strftime("%Y/%m/%d %H:%M"), "name": s["name"], "en": s["en"], "code": s["code"],
             "dec": s["dec"], "asof": rows[-1]["d"], "live": live, "swing": swing,
             "status": {"Yahoo": {"ok": True, "asof": rows[-1]["d"], "err": None}}}
 

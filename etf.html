@@ -83,7 +83,7 @@
   <div id="cards" style="display:contents"></div>
   <div class="card"><div class="notes">
     <p>[註1]：下方量柱為當日成交量（百萬股），紅柱代表當日收盤高於前一日、綠柱代表低於前一日；最左邊是低點當天的全日成交量。</p>
-    <p>[註2]：回補位 = 低點 + 比例 ×（高點 − 低點），高低點皆取盤中價；38.2%、50%、61.8% 是常用的回檔比例，不具預測力。高低點日期為手動設定（pipeline/retrace.py）。</p>
+    <p>[註2]：回補位 = 低點 + 比例 ×（高點 − 低點），高低點皆取收盤價（與大盤監控頁一致）；38.2%、50%、61.8% 是常用的回檔比例，不具預測力。高低點日期為手動設定（pipeline/retrace.py）。</p>
     <p>[註3]：MACD 為收盤價 EMA12 − EMA26，信號線為其 9 日 EMA，柱 = MACD − 信號；數值以含低點之前的完整日線計算，柱上數字為柱值。</p>
   </div></div>
 </div>
@@ -100,7 +100,7 @@ Promise.all(KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).then
   DATA = arr;
   $("cards").innerHTML = arr.map((d, i) => {
     const sw = d.swing;
-    return `<section class="card"><div class="head"><h2>${esc(d.name)}（${esc(d.code)}）</h2><span>${short(sw.high.date)} 高點至 ${short(sw.low.date)} 低點；以低點為原點，之後每日收盤；資料日 ${d.asof.replace(/-/g, "/")}</span></div>
+    return `<section class="card"><div class="head"><h2>${esc(d.name)}（${esc(d.code)}）</h2><span>${short(sw.high.date)} 收盤高點至 ${short(sw.low.date)} 收盤低點；以收盤低點為原點，之後每日收盤；資料日 ${d.asof.replace(/-/g, "/")}</span></div>
       <div id="rc${i}" style="width:100%"></div><div class="legend" id="rl${i}"></div></section>`;
   }).join("");
   const asof = arr.map(d => d.asof).sort().pop();
