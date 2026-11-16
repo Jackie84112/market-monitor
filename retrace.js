@@ -41,12 +41,18 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
     g += `<line x1="${L}" x2="${W - R}" y1="${Y(l.v)}" y2="${Y(l.v)}" stroke="#6B7178" stroke-width="1.2" stroke-dasharray="6 4"/>
       <text x="${W - R + 6}" y="${Y(l.v) + 3.5}" font-size="10.5" fill="#4B5158">${l.name}　${fmt(l.v, dec)}</text>`;
   });
-  // VPVR（成交量分布）：從左軸向右長的橫條；滑鼠移到橫條上，左軸顯示該格股價、右側顯示回補水位（虛線）。資料見 pipeline/retrace.py 的 vpvr
-  const vp = sw.vp, vmx = vp ? Math.max(...vp.bins.map(b => b[2])) : 1, vpMaxW = (W - L - R) * .3, vpW = b => vpMaxW * b[2] / vmx;
-  if (vp) vp.bins.forEach(b => {
+  // VPVR（成交量分布）：從左軸向右長的橫條。藍＝10/6 高點日起（15 分 K）、灰＝2026 整年（日線）；兩組各自以自己的最大量為滿寬，可同時顯示。
+  // 滑鼠移到橫條上，左軸顯示該格股價、右側顯示回補水位（虛線）。資料見 pipeline/retrace.py、amd.py 的 vpvr / vpvr_daily
+  const vm_ = typeof VPM === "undefined" ? "both" : VPM, vpS = vm_ === "both" || vm_ === "swing" ? sw.vp : null, vpY = vm_ === "both" || vm_ === "year" ? sw.vpYear : null;
+  const vpMx = p => p ? Math.max(...p.bins.map(b => b[2])) : 1, vmS = vpMx(vpS), vmY = vpMx(vpY), vpMaxW = (W - L - R) * .3;
+  const volAt = (p, v) => { const b = p && p.bins.find(x => v >= x[0] && v < x[1]); return b ? b[2] : 0; };
+  const vpStep = (vpS || vpY || {}).step || 1;
+  const vpBar = (p, mx, fill, op) => p && p.bins.forEach(b => {
     const y1 = Y(b[1]), y0 = Y(b[0]);
-    g += `<rect x="${L}" y="${(y1 + .5).toFixed(1)}" width="${vpW(b).toFixed(1)}" height="${Math.max(1, y0 - y1 - 1).toFixed(1)}" fill="var(--chart)" opacity=".28"/>`;
+    g += `<rect x="${L}" y="${(y1 + .5).toFixed(1)}" width="${(vpMaxW * b[2] / mx).toFixed(1)}" height="${Math.max(1, y0 - y1 - 1).toFixed(1)}" fill="${fill}" opacity="${op}"/>`;
   });
+  vpBar(vpY, vmY, "#8C9096", .3);
+  vpBar(vpS, vmS, "var(--chart)", .38);
   // X 軸：每個交易日一格，標籤太擠就隔幾格標一次
   const step = Math.max(1, Math.ceil(46 / pw));
   pts.forEach((p, i) => {
@@ -119,17 +125,21 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
     const r = svg.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, i = Math.round((x - L) / pw);
     return i >= 0 && i <= n - 1 && Math.hypot(x - X(i), y - Y(pts[i][1])) <= 18 ? i : -1;
   };
-  const vpHit = e => {   // 滑鼠是否在 VPVR 某一條橫條上
-    if (!vp) return null;
+  const vpHit = e => {   // 滑鼠是否在 VPVR 某一條橫條上（任一組）
+    if (!vpS && !vpY) return null;
     const r = svg.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, v = lo + (T + PH - y) / PH * (vtop - lo);
-    return vp.bins.find(b => v >= b[0] && v < b[1] && x >= L && x <= L + vpW(b)) || null;
+    const s = volAt(vpS, v), yr = volAt(vpY, v), w = Math.max(s / vmS, yr / vmY) * vpMaxW;
+    if (!(w > 0) || x < L || x > L + w) return null;
+    const k = Math.floor((v - lo) / vpStep + 1e-9);
+    return {lo: lo + k * vpStep, hi: lo + (k + 1) * vpStep, s, y: yr, w};
   };
   const showVp = b => {
-    const v = (b[0] + b[1]) / 2, y = Y(v);
+    const v = (b.lo + b.hi) / 2, y = Y(v);
+    const txt = [vpS ? `10/6 起 ${fmt(b.s, 1)}` : "", vpY ? `整年 ${fmt(b.y, 1)}` : ""].filter(Boolean).join("　") + " 百萬股";
     hov.innerHTML = `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="${ACC}" stroke-width="1.5" stroke-dasharray="3 3"/>
       <text x="${L - 6}" y="${y + 3.5}" font-size="11.5" font-weight="700" fill="${ACC}" text-anchor="end" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${fmt(v, dec)}</text>
       <text x="${W - R + 6}" y="${y + 3.5}" font-size="11.5" font-weight="700" fill="${ACC}" style="paint-order:stroke;stroke:#fff;stroke-width:3px">回補 ${fmt(pc(v), 1)}%</text>
-      <text x="${L + vpW(b) + 6}" y="${y - 4}" font-size="11" fill="#4B5158" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${fmt(b[2], 1)} 百萬股</text>`;
+      <text x="${L + b.w + 6}" y="${y - 4}" font-size="11" fill="#4B5158" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${txt}</text>`;
   };
   svg.addEventListener("pointermove", e => {
     const i = near(e), vb_ = i < 0 ? vpHit(e) : null;
@@ -143,5 +153,5 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   });
   svg.addEventListener("pointerdown", e => { const i = near(e), b_ = i < 0 ? vpHit(e) : null; if (i >= 0) show(i); else if (b_) showVp(b_); else hov.innerHTML = ""; });   // 觸控螢幕：點一下顯示
   svg.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") hov.innerHTML = ""; });
-  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span><span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${sw.vp ? `<span><i style="background:var(--chart);opacity:.4"></i>VPVR 成交量分布（滑鼠移到柱上顯示股價與回補位）</span>` : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}`;
+  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span><span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vpS || vpY ? `<span><i style="background:var(--chart);opacity:.45"></i>${vpS ? "VPVR 10/6 起（15 分 K）" : ""}</span>` : ""}${vpY ? `<span><i style="background:#8C9096;opacity:.5"></i>VPVR ${sw.vpYear.start.slice(0, 4)} 整年（日線，圖軸外的量不畫）</span>` : ""}${vpS || vpY ? "<span>滑鼠移到橫條上顯示股價與回補位</span>" : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}`;
 }

@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from amd import daily, ema, r2, RETRACE, TW, vpvr  # noqa: E402
+from amd import daily, ema, r2, RETRACE, TW, vpvr, vpvr_daily, YEAR_START  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
 STOCKS = [
@@ -49,6 +49,7 @@ def build(s):
             swing["vp"] = vpvr(s["sym"], s["high"], lo, hi, s["vpvr"])
         except Exception as e:
             print("ERR vpvr", s["key"], e)
+        swing["vpYear"] = vpvr_daily(rows, YEAR_START, lo, hi, s["vpvr"])   # 拉長對照：2026 整年（日線）
     return {"lowWord": "收盤低" if s.get("close") else "最低", "updated": dt.datetime.now(TW).strftime("%Y/%m/%d %H:%M"), "name": s["name"], "en": s["en"], "code": s["code"],
             "dec": s["dec"], "asof": rows[-1]["d"], "live": live, "swing": swing,
             "status": {"Yahoo": {"ok": True, "asof": rows[-1]["d"], "err": None}}}
