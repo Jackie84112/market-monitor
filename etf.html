@@ -85,10 +85,10 @@
     <p>[註1]：下方量柱為當日成交量（百萬股），紅柱代表當日收盤高於前一日、綠柱代表低於前一日；最左邊是低點當天的全日成交量。</p>
     <p>[註2]：回補位 = 低點 + 比例 ×（高點 − 低點），高低點皆取收盤價（與大盤監控頁一致）；38.2%、50%、61.8% 是常用的回檔比例，不具預測力。高低點日期為手動設定（pipeline/retrace.py）。</p>
     <p>[註3]：MACD 為收盤價 EMA12 − EMA26，信號線為其 9 日 EMA，柱 = MACD − 信號；數值以含低點之前的完整日線計算，柱上數字為柱值。</p>
-    <p>[註4]：VPVR（0050 試做）＝10/6 高點日起的成交量分布，用 15 分 K，每根的量平均攤在它的最低～最高價之間、每格 0.5 元；滑鼠移到橫條上，左邊顯示該格股價、右邊顯示回補水位。低於圖軸底（收盤低點 92.50）的量不計入。</p>
+    <p>[註4]：橫向淡藍柱為 VPVR（成交量分布）：10/6 高點日起，用 15 分 K，每根的量平均攤在它的最低～最高價之間；每格寬度 0050 為 0.5 元、SOXX 與 SPY 為 1 美元、QQQ 為 2 美元。滑鼠移到橫條上，左邊顯示該格股價、右邊顯示回補水位。低於圖軸底（收盤低點）的量不計入。</p>
   </div></div>
 </div>
-<script src="retrace.js?v=20261116b"></script>
+<script src="retrace.js?v=20261116c"></script>
 <script>
 const $ = id => document.getElementById(id);
 const fmt = (v, d = 2) => v == null ? "—" : Number(v).toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});

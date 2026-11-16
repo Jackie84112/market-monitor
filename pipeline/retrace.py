@@ -21,16 +21,16 @@ STOCKS = [
     {"key": "avgo", "sym": "AVGO", "name": "博通", "en": "Broadcom", "code": "AVGO", "high": "2026-10-06", "low": "2026-11-06", "dec": 2, "ccy": "USD"},
     # ETF 監控子頁（etf.html）四檔；低點日期手動設定（高點之後盤中最低價所在日）
     {"key": "etf_0050", "sym": "0050.TW", "name": "元大台灣50", "en": "Yuanta Taiwan 50 ETF", "code": "0050", "high": "2026-10-06", "low": "2026-11-06", "dec": 2, "ccy": "TWD", "close": True, "vpvr": 0.5},
-    {"key": "etf_soxx", "sym": "SOXX", "name": "iShares 半導體 ETF", "en": "iShares Semiconductor ETF", "code": "SOXX", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True},
-    {"key": "etf_qqq", "sym": "QQQ", "name": "Invesco 那斯達克100 ETF", "en": "Invesco QQQ Trust", "code": "QQQ", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True},
-    {"key": "etf_spy", "sym": "SPY", "name": "SPDR 標普500 ETF", "en": "SPDR S&P 500 ETF", "code": "SPY", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True},
+    {"key": "etf_soxx", "sym": "SOXX", "name": "iShares 半導體 ETF", "en": "iShares Semiconductor ETF", "code": "SOXX", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True, "vpvr": 1},
+    {"key": "etf_qqq", "sym": "QQQ", "name": "Invesco 那斯達克100 ETF", "en": "Invesco QQQ Trust", "code": "QQQ", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True, "vpvr": 2},
+    {"key": "etf_spy", "sym": "SPY", "name": "SPDR 標普500 ETF", "en": "SPDR S&P 500 ETF", "code": "SPY", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True, "vpvr": 1},
 ]
 
 
 def vpvr(sym, start, lo, hi, step):
     """VPVR（可視範圍成交量分布）：取起算日（高點日）起的 15 分 K，每根 K 的量平均攤到它的 低~高 價格格內。
     回傳 {bins:[[格下緣,格上緣,量(百萬股)]], poc, vah, val, src}；價值區＝由 POC 向外擴到涵蓋 70% 成交量。"""
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{requests.utils.quote(sym)}?range=1mo&interval=15m"
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{requests.utils.quote(sym)}?range=60d&interval=15m"
     r = requests.get(url, headers=UA, timeout=40)
     r.raise_for_status()
     j = r.json()["chart"]["result"][0]
