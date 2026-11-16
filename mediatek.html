@@ -70,6 +70,10 @@
   .vb.cur .t i{background:var(--accent);opacity:1;}
   .vb.cur{font-weight:600;}
   .vb .r{text-align:right;}
+  .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:#fff;}
+  .seg button{font:inherit;font-size:13.5px;border:0;background:transparent;color:var(--ink);padding:5px 16px;cursor:pointer;}
+  .seg button.on{background:var(--ink);color:#fff;}
 </style>
 </head>
 <body>
@@ -83,6 +87,7 @@
 
   <section class="card">
     <div class="head"><h2>回補走勢</h2><span id="hsub">以低點為原點，之後每日收盤；滑鼠移到點上，顯示該日的回補水位</span></div>
+    <div id="vpbox"></div>
     <div id="rchart" style="width:100%"></div>
     <div class="legend" id="rlegend"></div>
     <div class="notes">
@@ -95,7 +100,8 @@
   </section>
 </div>
 <script src="retrace_page.js"></script>
-<script src="retrace.js?v=20261116d"></script>
+<script src="retrace.js?v=20261116f"></script>
+<script>$("vpbox").innerHTML = VP_SEG("rchart"); bindVpSeg(id => drawRetrace($(id)));</script>
 <script>initPage("mediatek");</script>
 </body>
 </html>

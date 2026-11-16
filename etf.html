@@ -70,6 +70,10 @@
   .vb.cur .t i{background:var(--accent);opacity:1;}
   .vb.cur{font-weight:600;}
   .vb .r{text-align:right;}
+  .ctl{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:#fff;}
+  .seg button{font:inherit;font-size:13.5px;border:0;background:transparent;color:var(--ink);padding:5px 16px;cursor:pointer;}
+  .seg button.on{background:var(--ink);color:#fff;}
 </style>
 </head>
 <body>
@@ -89,7 +93,7 @@
     <p>[註5]：VPVR 同時畫兩組：藍＝10/6 高點日起（15 分 K）、灰＝2026 整年（日線，每日量平均攤在當日高低之間，精度較粗）；兩組各以自己的最大量為滿寬，滑鼠移到橫條上兩組的量都會顯示。低於圖軸底或高於圖軸頂的量不畫。</p>
   </div></div>
 </div>
-<script src="retrace.js?v=20261116d"></script>
+<script src="retrace.js?v=20261116f"></script>
 <script>
 const $ = id => document.getElementById(id);
 const fmt = (v, d = 2) => v == null ? "—" : Number(v).toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
@@ -103,12 +107,14 @@ Promise.all(KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).then
   $("cards").innerHTML = arr.map((d, i) => {
     const sw = d.swing;
     return `<section class="card"><div class="head"><h2>${esc(d.name)}（${esc(d.code)}）</h2><span>${short(sw.high.date)} 收盤高點至 ${short(sw.low.date)} 收盤低點；以收盤低點為原點，之後每日收盤；資料日 ${d.asof.replace(/-/g, "/")}</span></div>
+      ${VP_SEG("rc" + i)}
       <div id="rc${i}" style="width:100%"></div><div class="legend" id="rl${i}"></div></section>`;
   }).join("");
   const asof = arr.map(d => d.asof).sort().pop();
   $("sub").textContent = `0050、SOXX、QQQ、SPY　｜　最新資料日：${asof.replace(/-/g, "/")}　｜　資料更新：${arr[0].updated}（台灣時間）`;
   $("st").innerHTML = arr.map(d => { const s = d.status.Yahoo;
     return `<span class="chip ${s.ok ? "" : "r"}" title="${s.err ? esc(s.err) : ""}">${esc(d.code)} ${s.ok ? "至" : "抓取失敗，沿用至"} ${short(s.asof)}</span>`; }).join("");
+  bindVpSeg(id => { const i = +id.slice(2); drawRetrace($(id), DATA[i], $("rl" + i)); });
   draw();
   let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(draw, 150); });
 }).catch(e => { $("sub").innerHTML = `<span style="color:#C02323">資料讀取失敗：${e}</span>`; console.error(e); });
