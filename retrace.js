@@ -56,7 +56,7 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   // VPVR（成交量分布）：從左軸向右長的橫條；由「VPVR 範圍」開關選 10/6 起（15 分 K）或 2026 整年（日線）或關。
   // 滑鼠移到橫條上，左軸顯示該格股價、右側顯示回補水位（虛線）。資料見 pipeline/retrace.py、amd.py 的 vpvr / vpvr_daily
   const vm_ = (drawRetrace.vpm = drawRetrace.vpm || {})[el.id] || (typeof VPM === "undefined" ? "swing" : VPM);
-  const vp = vm_ === "off" ? null : vm_ === "year" ? sw.vpYear : sw.vp, vmx = vp ? Math.max(...vp.bins.map(b => b[2])) : 1, vpMaxW = (W - L - R) * .3, vpW = b => vpMaxW * b[2] / vmx;
+  const vp0 = vm_ === "off" ? null : vm_ === "year" ? sw.vpYear : sw.vp, vp = vp0 && {...vp0, bins: vp0.bins.filter(b => b[1] > vbot && b[0] < vtop)}, vmx = vp ? Math.max(1e-9, ...vp.bins.map(b => b[2])) : 1, vpMaxW = (W - L - R) * .3, vpW = b => vpMaxW * b[2] / vmx;
   if (vp) vp.bins.forEach(b => {
     const y1 = Y(b[1]), y0 = Y(b[0]);
     g += `<rect x="${L}" y="${(y1 + .5).toFixed(1)}" width="${vpW(b).toFixed(1)}" height="${Math.max(1, y0 - y1 - 1).toFixed(1)}" fill="var(--chart)" opacity=".28"/>`;
@@ -160,7 +160,7 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   });
   svg.addEventListener("pointerdown", e => { const i = near(e), b_ = i < 0 ? vpHit(e) : null; if (i >= 0) show(i); else if (b_) showVp(b_); else hov.innerHTML = ""; });   // 觸控螢幕：點一下顯示
   svg.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") hov.innerHTML = ""; });
-  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span><span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vp ? `<span><i style="background:var(--chart);opacity:.4"></i>VPVR 成交量分布：${vm_ === "year" ? sw.vpYear.start.slice(0, 4) + " 整年（日線，圖軸外的量不畫）" : "10/6 起（15 分 K）"}；滑鼠移到柱上顯示股價與回補位</span>` : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}`;
+  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span><span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vp ? `<span><i style="background:var(--chart);opacity:.4"></i>VPVR 成交量分布：${vm_ === "year" ? sw.vpYear.start.slice(0, 4) + " 整年（日線，只畫目前圖軸範圍內的量）" : "10/6 起（15 分 K）"}；滑鼠移到柱上顯示股價與回補位</span>` : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}`;
 }
 
 // VPVR 範圍開關（格式同 amd.html）：10/6 起／2026 整年／關；每張圖各自記住選擇

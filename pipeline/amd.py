@@ -104,20 +104,20 @@ def vpvr(sym, start, lo, hi, step):
 
 
 def vpvr_daily(rows, start, lo, hi, step):
-    """日線版 VPVR（拉長到整年用）：每日成交量平均攤在當日 低~高 之間；只留圖軸 [lo, hi] 內的格子，軸外的量不畫（可視範圍）。
-    回傳 {bins, total（軸內量）, all（區間全部量）, start}。"""
-    nb = int(round((hi - lo) / step)) + 1
-    acc, allv = [0.0] * nb, 0.0
+    """日線版 VPVR（拉長到整年用）：每日成交量平均攤在當日 低~高 之間，格子以 lo 為基準對齊、涵蓋整段期間的全部價位
+    （不再只留 [lo, hi]；頁面畫圖時依當下圖軸範圍挑可見的格子）。回傳 {bins, total（[lo,hi] 內的量）, all（區間全部量）, start}。"""
+    acc, allv = {}, 0.0
     for x in rows:
         if x["d"] < start or not x["v"]:
             continue
         v = x["v"] / 1e6
         allv += v
         a, z = int((x["l"] - lo) // step), int((x["h"] - lo) // step)
-        for b in range(max(a, 0), min(z, nb - 1) + 1):
-            acc[b] += v / (z - a + 1)
-    return {"step": step, "start": start, "total": r2(sum(acc), 1), "all": r2(allv, 1), "src": "1d",
-            "bins": [[r2(lo + b * step), r2(lo + (b + 1) * step), r2(acc[b], 2)] for b in range(nb) if acc[b] > 0]}
+        for b in range(a, z + 1):
+            acc[b] = acc.get(b, 0.0) + v / (z - a + 1)
+    nb = int(round((hi - lo) / step)) + 1
+    return {"step": step, "start": start, "total": r2(sum(v for b, v in acc.items() if 0 <= b < nb), 1), "all": r2(allv, 1), "src": "1d",
+            "bins": [[r2(lo + b * step), r2(lo + (b + 1) * step), r2(acc[b], 2)] for b in sorted(acc) if acc[b] > 0]}
 
 
 def extended(sym):
