@@ -28,7 +28,7 @@ STOCKS = [
 
 
 def vpvr(sym, start, lo, hi, step):
-    """VPVR（可視範圍成交量分布）：取低點日起的 15 分 K，每根 K 的量平均攤到它的 低~高 價格格內。
+    """VPVR（可視範圍成交量分布）：取起算日（高點日）起的 15 分 K，每根 K 的量平均攤到它的 低~高 價格格內。
     回傳 {bins:[[格下緣,格上緣,量(百萬股)]], poc, vah, val, src}；價值區＝由 POC 向外擴到涵蓋 70% 成交量。"""
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{requests.utils.quote(sym)}?range=1mo&interval=15m"
     r = requests.get(url, headers=UA, timeout=40)
@@ -83,7 +83,7 @@ def build(s):
              "levels": [{"name": f"{p * 100:.1f}%", "v": r2(lo + p * (hi - lo)), "hit": cur >= lo + p * (hi - lo)} for p in RETRACE]}
     if s.get("vpvr"):
         try:
-            swing["vp"] = vpvr(s["sym"], s["low"], lo, hi, s["vpvr"])
+            swing["vp"] = vpvr(s["sym"], s["high"], lo, hi, s["vpvr"])
         except Exception as e:
             print("ERR vpvr", s["key"], e)
     return {"lowWord": "收盤低" if s.get("close") else "最低", "updated": dt.datetime.now(TW).strftime("%Y/%m/%d %H:%M"), "name": s["name"], "en": s["en"], "code": s["code"],
