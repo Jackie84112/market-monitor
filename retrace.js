@@ -41,6 +41,16 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
     g += `<line x1="${L}" x2="${W - R}" y1="${Y(l.v)}" y2="${Y(l.v)}" stroke="#6B7178" stroke-width="1.2" stroke-dasharray="6 4"/>
       <text x="${W - R + 6}" y="${Y(l.v) + 3.5}" font-size="10.5" fill="#4B5158">${l.name}　${fmt(l.v, dec)}</text>`;
   });
+  // VPVR（可視範圍成交量分布）：從左軸向右長的橫條，價值區（70% 量）較深，POC 以紅色標出；資料見 pipeline/retrace.py 的 vpvr
+  if (sw.vp) {
+    const vp = sw.vp, vmx = Math.max(...vp.bins.map(b => b[2])), maxW = (W - L - R) * .3;
+    vp.bins.forEach(b => {
+      const inVA = b[0] >= vp.val - 1e-9 && b[1] <= vp.vah + 1e-9, isPoc = vp.poc >= b[0] && vp.poc < b[1], y1 = Y(b[1]), y0 = Y(b[0]);
+      g += `<rect x="${L}" y="${(y1 + .5).toFixed(1)}" width="${(maxW * b[2] / vmx).toFixed(1)}" height="${Math.max(1, y0 - y1 - 1).toFixed(1)}" fill="${isPoc ? "#B04A2F" : "var(--chart)"}" opacity="${isPoc ? .6 : inVA ? .42 : .2}"/>`;
+    });
+    [[vp.vah, "VAH"], [vp.val, "VAL"]].forEach(([v, t]) => { g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="var(--chart)" stroke-width="1" stroke-dasharray="2 3" opacity=".6"/><text x="${W - R + 6}" y="${Y(v) + 3.5}" font-size="10.5" fill="var(--chart)">${t}　${fmt(v, dec)}</text>`; });
+    g += `<line x1="${L}" x2="${W - R}" y1="${Y(vp.poc)}" y2="${Y(vp.poc)}" stroke="#B04A2F" stroke-width="1" opacity=".7"/><text x="${W - R + 6}" y="${Y(vp.poc) + 3.5 - (Y(lo) - Y(vp.poc) < 14 ? 13 : 0)}" font-size="10.5" fill="#B04A2F" font-weight="600">POC　${fmt(vp.poc, dec)}</text>`;
+  }
   // X 軸：每個交易日一格，標籤太擠就隔幾格標一次
   const step = Math.max(1, Math.ceil(46 / pw));
   pts.forEach((p, i) => {
@@ -124,5 +134,5 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   });
   svg.addEventListener("pointerdown", e => { const i = near(e); if (i >= 0) show(i); else hov.innerHTML = ""; });   // 觸控螢幕：點一下顯示
   svg.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") hov.innerHTML = ""; });
-  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span><span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}`;
+  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span><span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${sw.vp ? `<span><i style="background:var(--chart);opacity:.4"></i>VPVR 成交量分布（深色＝價值區 70%）</span>` : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}`;
 }
