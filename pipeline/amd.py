@@ -66,6 +66,42 @@ def daily(sym, rng="2y"):
     return out, live, m.get("regularMarketTime")
 
 
+def vpvr(sym, start, lo, hi, step):
+    """VPVR（可視範圍成交量分布）：取起算日（高點日）起的 15 分 K，每根 K 的量平均攤到它的 低~高 價格格內。
+    回傳 {bins:[[格下緣,格上緣,量(百萬股)]], poc, vah, val, src}；價值區＝由 POC 向外擴到涵蓋 70% 成交量。"""
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{requests.utils.quote(sym)}?range=60d&interval=15m"
+    r = requests.get(url, headers=UA, timeout=40)
+    r.raise_for_status()
+    j = r.json()["chart"]["result"][0]
+    q, off = j["indicators"]["quote"][0], j["meta"].get("gmtoffset", 0)
+    nb = int(round((hi - lo) / step)) + 1
+    acc = [0.0] * nb
+    for i, t in enumerate(j["timestamp"]):
+        h, l, v = q["high"][i], q["low"][i], q["volume"][i]
+        if None in (h, l) or not v:
+            continue
+        if dt.datetime.fromtimestamp(t + off, dt.timezone.utc).strftime("%Y-%m-%d") < start:
+            continue
+        a, z = int((l - lo) // step), int((h - lo) // step)   # 低於圖軸底（收盤低點）的格子不畫，但量照比例攤，只留畫面內的
+        for b in range(max(a, 0), min(z, nb - 1) + 1):
+            acc[b] += v / (z - a + 1) / 1e6
+    tot = sum(acc)
+    if tot <= 0:
+        raise ValueError("vpvr 無量")
+    poc = max(range(nb), key=lambda b: acc[b])
+    a = z = poc
+    got = acc[poc]
+    while got < tot * 0.7 and (a > 0 or z < nb - 1):
+        up = acc[z + 1] if z < nb - 1 else -1
+        dn = acc[a - 1] if a > 0 else -1
+        if up >= dn:
+            z += 1; got += up
+        else:
+            a -= 1; got += dn
+    bins = [[r2(lo + b * step), r2(lo + (b + 1) * step), r2(acc[b], 2)] for b in range(nb) if acc[b] > 0]
+    return {"step": step, "total": r2(tot, 1), "bins": bins, "poc": r2(lo + (poc + .5) * step), "val": r2(lo + a * step), "vah": r2(lo + (z + 1) * step), "src": "15m", "start": start}
+
+
 def extended(sym):
     """最新一筆含盤前盤後的 5 分 K：回傳 (價, 時間, 時段)。"""
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{requests.utils.quote(sym)}?range=1d&interval=5m&includePrePost=true"
@@ -232,6 +268,10 @@ def build():
     for lv in LEVELS:
         levels.append({**lv, "dist": r2((lv["v"] / cur - 1) * 100, 1)})
 
+    try:
+        swing["vp"] = vpvr("AMD", SWING_HIGH_DATE, lo, hi, 10)   # VPVR：高點日起的成交量分布，每格 10 美元
+    except Exception as ex:
+        print("AMD vpvr 失敗：", ex)
     return {"updated": dt.datetime.now(TW).strftime("%Y/%m/%d %H:%M"), "status": status, "quote": quote, "stats": stats, "swing": swing,
             "mas": mas, "volume": volume, "macd": macd, "gaps": gaps, "vbp": vbp, "chart": chart, "sox": sox,
             "levels": levels, "levelsAsof": LEVELS_ASOF}
