@@ -20,6 +20,7 @@ UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.3
 TW = dt.timezone(dt.timedelta(hours=8))
 
 SWING_HIGH_DATE = "2026-10-06"   # 回補關卡的高點日（盤中最高價），換波段時手動改
+YEAR_START = "2026-01-01"         # VPVR 拉長對照的起算日（整年）
 SWING_LOW_DATE = "2026-11-05"    # 回補關卡的低點日（盤中最低價）
 RETRACE = (0.382, 0.5, 0.618, 0.786)
 CHART_DAYS = 100                 # 走勢圖顯示的交易日數
@@ -100,6 +101,23 @@ def vpvr(sym, start, lo, hi, step):
             a -= 1; got += dn
     bins = [[r2(lo + b * step), r2(lo + (b + 1) * step), r2(acc[b], 2)] for b in range(nb) if acc[b] > 0]
     return {"step": step, "total": r2(tot, 1), "bins": bins, "poc": r2(lo + (poc + .5) * step), "val": r2(lo + a * step), "vah": r2(lo + (z + 1) * step), "src": "15m", "start": start}
+
+
+def vpvr_daily(rows, start, lo, hi, step):
+    """日線版 VPVR（拉長到整年用）：每日成交量平均攤在當日 低~高 之間；只留圖軸 [lo, hi] 內的格子，軸外的量不畫（可視範圍）。
+    回傳 {bins, total（軸內量）, all（區間全部量）, start}。"""
+    nb = int(round((hi - lo) / step)) + 1
+    acc, allv = [0.0] * nb, 0.0
+    for x in rows:
+        if x["d"] < start or not x["v"]:
+            continue
+        v = x["v"] / 1e6
+        allv += v
+        a, z = int((x["l"] - lo) // step), int((x["h"] - lo) // step)
+        for b in range(max(a, 0), min(z, nb - 1) + 1):
+            acc[b] += v / (z - a + 1)
+    return {"step": step, "start": start, "total": r2(sum(acc), 1), "all": r2(allv, 1), "src": "1d",
+            "bins": [[r2(lo + b * step), r2(lo + (b + 1) * step), r2(acc[b], 2)] for b in range(nb) if acc[b] > 0]}
 
 
 def extended(sym):
@@ -272,6 +290,7 @@ def build():
         swing["vp"] = vpvr("AMD", SWING_HIGH_DATE, lo, hi, 10)   # VPVR：高點日起的成交量分布，每格 10 美元
     except Exception as ex:
         print("AMD vpvr 失敗：", ex)
+    swing["vpYear"] = vpvr_daily(rows, YEAR_START, lo, hi, 10)   # 拉長對照：2026 整年（日線）
     return {"updated": dt.datetime.now(TW).strftime("%Y/%m/%d %H:%M"), "status": status, "quote": quote, "stats": stats, "swing": swing,
             "mas": mas, "volume": volume, "macd": macd, "gaps": gaps, "vbp": vbp, "chart": chart, "sox": sox,
             "levels": levels, "levelsAsof": LEVELS_ASOF}
