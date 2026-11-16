@@ -2,7 +2,7 @@
 """回補走勢子頁資料管線（聯發科、博通）：Yahoo 日線 → 低點之後每日收盤與量 → data/<key>.json。
 
 - 格式與 amd.json 的 swing 區塊一致，頁面沿用 retrace.js 畫圖。
-- 高低點日期依使用者定案的「回補關卡一律以 10/6 為高點」；低點取高點之後的盤中最低價所在日。
+- 高低點日期依使用者定案的「回補關卡一律以 10/6 為高點」；高低點一律用收盤價（使用者定案：所有價格都用收盤價）；低點取高點之後最低收盤價所在日。
   換波段時手動改下面 STOCKS 的 high / low 日期。
 - 由 build.py 在 amd.py 之後呼叫；失敗只沿用上次檔案，不影響大盤資料。
 """
@@ -16,9 +16,9 @@ from amd import daily, ema, r2, RETRACE, TW, vpvr, vpvr_daily, YEAR_START  # noq
 
 ROOT = Path(__file__).resolve().parent.parent
 STOCKS = [
-    {"key": "mediatek", "sym": "2454.TW", "name": "聯發科", "en": "MediaTek", "code": "2454", "high": "2026-10-06", "low": "2026-11-06", "dec": 0, "ccy": "TWD", "vpvr": 50, "hist": True},
-    {"key": "avgo", "sym": "AVGO", "name": "博通", "en": "Broadcom", "code": "AVGO", "high": "2026-10-06", "low": "2026-11-06", "dec": 2, "ccy": "USD"},
-    # ETF 監控子頁（etf.html）四檔；低點日期手動設定（高點之後盤中最低價所在日）
+    {"key": "mediatek", "sym": "2454.TW", "name": "聯發科", "en": "MediaTek", "code": "2454", "high": "2026-10-06", "low": "2026-11-06", "dec": 0, "ccy": "TWD", "close": True, "vpvr": 50, "hist": True},
+    {"key": "avgo", "sym": "AVGO", "name": "博通", "en": "Broadcom", "code": "AVGO", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True},
+    # ETF 監控子頁（etf.html）四檔；低點日期手動設定（高點之後最低收盤價所在日）
     {"key": "etf_0050", "sym": "0050.TW", "name": "元大台灣50", "en": "Yuanta Taiwan 50 ETF", "code": "0050", "high": "2026-10-06", "low": "2026-11-06", "dec": 2, "ccy": "TWD", "close": True, "vpvr": 0.5},
     {"key": "etf_soxx", "sym": "SOXX", "name": "iShares 半導體 ETF", "en": "iShares Semiconductor ETF", "code": "SOXX", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True, "vpvr": 1},
     {"key": "etf_qqq", "sym": "QQQ", "name": "Invesco 那斯達克100 ETF", "en": "Invesco QQQ Trust", "code": "QQQ", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True, "vpvr": 2},

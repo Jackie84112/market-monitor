@@ -284,7 +284,7 @@ function syncPE() {
 
 // 回補走勢：原點＝低點日最低價，Y 軸涵蓋 0%（低點）到 100%（高點）；滑鼠移到點上自動標出該日回補水位（虛線）與只有股價的浮標；下方為每日量柱
 function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
-  const DD = data || {swing: A.swing, dec: 2, en: "AMD"}, sw = DD.swing, lo = sw.low.v, hi = sw.high.v, span = hi - lo;
+  const DD = data || {swing: A.swing, dec: 2, en: "AMD", lowWord: "收盤低"}, sw = DD.swing, lo = sw.low.v, hi = sw.high.v, span = hi - lo;
   const path0 = sw.path || [];
   const pts = [[sw.low.date, lo], ...path0.map(p => [p[0], p[1]])], n = pts.length;
   const vols = sw.lowVol != null && path0.every(p => p[2] != null) ? [sw.lowVol, ...path0.map(p => p[2])] : null;

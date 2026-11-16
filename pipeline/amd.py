@@ -19,9 +19,9 @@ OUT = ROOT / "data" / "amd.json"
 UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/126 Safari/537.36"}
 TW = dt.timezone(dt.timedelta(hours=8))
 
-SWING_HIGH_DATE = "2026-10-06"   # 回補關卡的高點日（盤中最高價），換波段時手動改
+SWING_HIGH_DATE = "2026-10-06"   # 回補關卡的高點日（收盤價），換波段時手動改
 YEAR_START = "2026-01-01"         # VPVR 拉長對照的起算日（整年）
-SWING_LOW_DATE = "2026-11-05"    # 回補關卡的低點日（盤中最低價）
+SWING_LOW_DATE = "2026-11-05"    # 回補關卡的低點日（收盤價）
 RETRACE = (0.382, 0.5, 0.618, 0.786)
 CHART_DAYS = 100                 # 走勢圖顯示的交易日數
 VBP_START = "2026-05-06"         # 量價分布起算日（5/6 缺口當天）
@@ -171,10 +171,10 @@ def build():
         except Exception as ex:
             print("AMD 盤前盤後失敗：", ex)
 
-    # ---- 回補關卡（盤中高低點）
+    # ---- 回補關卡（收盤高低點）
     hi_row = next(x for x in rows if x["d"] == SWING_HIGH_DATE)
     lo_row = next(x for x in rows if x["d"] == SWING_LOW_DATE)
-    hi, lo = hi_row["h"], lo_row["l"]
+    hi, lo = hi_row["c"], lo_row["c"]   # 高低點一律用收盤價（使用者定案）
     cur = last["c"]
     lo_i = rows.index(lo_row)
     _l = [a - b for a, b in zip(ema(C, 12), ema(C, 26))]
