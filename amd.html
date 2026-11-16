@@ -93,12 +93,6 @@
   </header>
 
   <section class="card">
-    <div class="head"><h2>現況</h2><span>位置、動能與量能一覽；10/6 高點至 11/5 低點的回補進度</span></div>
-    <div class="kpis" id="kpis"></div>
-    <div style="margin-top:16px" id="retrace"></div>
-  </section>
-
-  <section class="card">
     <div class="head"><h2>回補走勢</h2><span>以低點為原點，之後每日收盤；滑鼠移到點上，顯示該日的回補水位</span></div>
     <div class="ctl" style="margin:0 0 8px"><span style="font-size:13px;color:var(--muted)">VPVR 範圍</span><div class="seg" id="vpseg"><button type="button" data-m="swing" class="on">10/6 起</button><button type="button" data-m="year">2026 整年</button><button type="button" data-m="off">關</button></div></div>
     <div id="rchart" style="width:100%"></div>
@@ -517,23 +511,6 @@ function render() {
   $("st").innerHTML = Object.entries(A.status).map(([k, s]) =>
     `<span class="chip ${s.ok ? "" : "r"}" title="${s.err ? esc(s.err) : ""}">${k} ${s.ok ? "至" : "抓取失敗，沿用至"} ${short(s.asof)}</span>`).join("") +
     `<span class="chip">價位地圖整理日 ${A.levelsAsof.replace(/-/g, "/")}</span>`;
-
-  const nx = sw.levels.find(l => !l.hit);
-  $("kpis").innerHTML = `
-    <div class="kpi"><div class="l">最新收盤${q.live ? '<span class="tag">盤中</span>' : ""}</div><div class="v">${fmt(q.close)}</div><div class="s"><span class="${cls(q.chg)}">${sign(q.chg, 2, "%")}</span>　開 ${fmt(q.open)}／高 ${fmt(q.high)}／低 ${fmt(q.low)}</div></div>
-    <div class="kpi"><div class="l">${q.ext ? q.ext.session + "報價" : "盤前盤後"}</div><div class="v">${q.ext ? fmt(q.ext.price) : "—"}</div><div class="s">${q.ext ? `<span class="${cls(q.ext.chg)}">${sign(q.ext.chg, 2, "%")}</span>　${twTime(q.ext.time)}（台灣）` : "目前沒有盤前盤後資料"}</div></div>
-    <div class="kpi"><div class="l">近 5 日漲幅</div><div class="v ${cls(A.stats.gain5)}">${sign(A.stats.gain5, 1, "%")}</div><div class="s">近 15 日 <span class="${cls(A.stats.gain15)}">${sign(A.stats.gain15, 1, "%")}</span>；距 60 日高 ${sign(A.stats.from60High, 1, "%")}</div></div>
-    <div class="kpi"><div class="l">距 ${short(sw.high.date)} 高點</div><div class="v ${cls(sw.fromHigh)}">${sign(sw.fromHigh, 1, "%")}</div><div class="s">高點 ${fmt(sw.high.v)}（盤中）</div></div>
-    <div class="kpi"><div class="l">距 ${short(sw.low.date)} 低點</div><div class="v ${cls(sw.fromLow)}">${sign(sw.fromLow, 1, "%")}</div><div class="s">低點 ${fmt(sw.low.v)}（盤中）；高到低 ${fmt(sw.drop, 1)}%</div></div>
-    <div class="kpi"><div class="l">量能狀態</div><div class="v">${v.state}</div><div class="s">10 日 ÷ 60 日 ${fmt(v.r60)}；÷ 250 日 ${fmt(v.r250)}</div></div>
-    <div class="kpi"><div class="l">MACD 柱狀圖</div><div class="v ${cls(m.hist)}">${sign(m.hist)}</div><div class="s">線 ${fmt(m.line)}／信號 ${fmt(m.signal)}${m.cross ? `；${short(m.cross.date)} ${m.cross.dir}` : ""}</div></div>`;
-
-  const pct = Math.max(0, Math.min(100, sw.retrace));
-  $("retrace").innerHTML = `<div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;margin-bottom:6px"><b>回補進度 ${fmt(sw.retrace, 1)}%</b><small>從 ${short(sw.high.date)} 高點 ${fmt(sw.high.v)} 到 ${short(sw.low.date)} 低點 ${fmt(sw.low.v)} 之間，現價 ${fmt(cur)} 已回到哪裡</small></div>
-    <span class="rt"><i style="width:${pct}%"></i>${sw.levels.map(l => `<b style="left:${parseFloat(l.name)}%"></b>`).join("")}</span>
-    <div class="rtl">${sw.levels.map(l => `<span style="left:${parseFloat(l.name)}%">${l.name}</span>`).join("")}</div>
-    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${sw.levels.map(l => `<span class="chip ${l.hit ? "g" : ""}">${l.name}　${fmt(l.v)}　${l.hit ? "已超過" : "未到，距 " + sign((l.v / cur - 1) * 100, 1, "%")}</span>`).join("")}</div>
-    <div class="notes" style="margin-top:8px"><p>[註]：回補位 = 低點 + 比例 ×（高點 − 低點）；38.2%、50%、61.8%、78.6% 是常用的回檔比例，不具預測力。高低點日期為手動設定（pipeline/amd.py）。</p></div>`;
 
   drawRetrace();
   drawPE();
