@@ -30,9 +30,9 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   const bar = (y, key, label, open) => { bands.push([y, y + TB, key]);
     return `<rect x="0" y="${y}" width="${W}" height="${TB}" rx="6" fill="#EFEDE7"/><text x="12" y="${y + 19}" font-size="14" font-weight="700" fill="#22262B" style="cursor:pointer">${open ? "▾" : "▸"}　${label}</text>
       <text x="${W - 12}" y="${y + 18}" font-size="11" fill="#6B7178" text-anchor="end">${open ? "點此收起" : "點此展開"}</text>`; };
-  // 均線（月線 20／季線 60／半年線 120／年線 240 日）：用 sw.hist 長日線算，回補段與各時間範圍都畫；開關存 drawRetrace.ma[el.id]（Set），預設全關；頁面要放 MA_SEG
+  // 均線（台股 20／60／120／240 日；美股 20／50／100／200 日，依 MA_SET 判斷）：用 sw.hist 長日線算，回補段與各時間範圍都畫；開關存 drawRetrace.ma[el.id]（Set），預設全關；頁面要放 MA_SEG
   const maSel = (drawRetrace.ma && drawRetrace.ma[el.id]) || new Set();
-  const mas = sw.hist ? MA_DEF.filter(m => maSel.has(m.k)).map(m => {
+  const mas = sw.hist ? MA_SET(DD.code).filter(m => maSel.has(m.k)).map(m => {
     const H_ = sw.hist, idx = {}; let s = 0;
     H_.forEach((h, k) => { s += h[1]; if (k >= m.n) s -= H_[k - m.n][1]; if (k >= m.n - 1) idx[h[0]] = s / m.n; });
     return {...m, pts: pts.map(p => idx[p[0]] ?? null)};
@@ -136,7 +136,7 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   const svg = el.firstChild, hov = svg.querySelector("#rhov");
   // 滑鼠移到點上：該日回補水位的虛線＋浮標（浮標只有股價）；同一天的量柱加外框
   const show = i => {
-    const v = pts[i][1], x = X(i), y = Y(v), txt = (hist ? short(pts[i][0]) + "　" : "") + fmt(v, dec) + mas.map(m => m.pts[i] != null ? "　" + m.s + " " + fmt(m.pts[i], dec) : "").join(""), w = txt.length * 7.6 + 18, h = 24;
+    const v = pts[i][1], x = X(i), y = Y(v), txt = (hist ? short(pts[i][0]) + "　" : "") + fmt(v, dec) + mas.map(m => m.pts[i] != null ? "　" + m.label + m.n + " " + fmt(m.pts[i], dec) : "").join(""), w = txt.length * 7.6 + 18, h = 24;
     const bx = Math.max(L + 2, Math.min(W - R - w - 2, x - w / 2)), by = y - 16 - h >= T ? y - 16 - h : y + 16;
     const vb = vols && st.vol ? `<rect x="${(X(i) - vbw / 2).toFixed(1)}" y="${(vbase - barH(vols[i])).toFixed(1)}" width="${vbw.toFixed(1)}" height="${barH(vols[i]).toFixed(1)}" rx="1.5" fill="none" stroke="${ACC}" stroke-width="1.6"/>` : "";
     hov.innerHTML = `<line x1="${L}" x2="${W - R}" y1="${y}" y2="${y}" stroke="${ACC}" stroke-width="1.5" stroke-dasharray="3 3"/>
@@ -173,7 +173,7 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   });
   svg.addEventListener("pointerdown", e => { const i = near(e), b_ = i < 0 ? vpHit(e) : null; if (i >= 0) show(i); else if (b_) showVp(b_); else hov.innerHTML = ""; });   // 觸控螢幕：點一下顯示
   svg.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") hov.innerHTML = ""; });
-  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span>${mas.map(m => { const last = [...m.pts].reverse().find(v => v != null); return `<span><i style="background:${m.c}"></i>${m.label}（${m.n} 日均線）${last != null ? "最新 " + fmt(last, dec) : ""}</span>`; }).join("")}<span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vp ? `<span><i style="background:var(--chart);opacity:.4"></i>VPVR 成交量分布：${vm_ === "year" ? sw.vpYear.start.slice(0, 4) + " 整年（日線，只畫目前圖軸範圍內的量）" : "10/6 起（15 分 K）"}；滑鼠移到柱上顯示股價與回補位</span>` : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}`;
+  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span>${mas.map(m => { const last = [...m.pts].reverse().find(v => v != null); return `<span><i style="background:${m.c}"></i>${m.label}${m.n}（${m.n} 日均線）${last != null ? "最新 " + fmt(last, dec) : ""}</span>`; }).join("")}<span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vp ? `<span><i style="background:var(--chart);opacity:.4"></i>VPVR 成交量分布：${vm_ === "year" ? sw.vpYear.start.slice(0, 4) + " 整年（日線，只畫目前圖軸範圍內的量）" : "10/6 起（15 分 K）"}；滑鼠移到柱上顯示股價與回補位</span>` : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}`;
 }
 
 // VPVR 範圍開關（格式同 amd.html）：10/6 起／2026 整年／關；每張圖各自記住選擇
@@ -189,12 +189,14 @@ function bindVpSeg(redraw) {
 
 // 均線開關：月線／季線／半年線／年線四個按鈕，可疊加、預設全關，每張圖各自記住；需資料有 swing.hist
 const MA_DEF = [
-  {k: "m", n: 20, label: "月線", s: "月", c: "#F08C00"},
-  {k: "q", n: 60, label: "季線", s: "季", c: "#7C3AED"},
-  {k: "h", n: 120, label: "半年線", s: "半年", c: "#0D9488"},
-  {k: "y", n: 240, label: "年線", s: "年", c: "#E11D74"},
+  {k: "m", label: "月線", c: "#F08C00", tw: 20, us: 20},
+  {k: "q", label: "季線", c: "#7C3AED", tw: 60, us: 50},
+  {k: "h", label: "半年線", c: "#0D9488", tw: 120, us: 100},
+  {k: "y", label: "年線", c: "#E11D74", tw: 240, us: 200},
 ];
-const MA_SEG = id => `<div class="ctl"><span style="font-size:13px;color:var(--muted)">均線</span><div class="seg" data-ma="${id}">${MA_DEF.map(m => `<button type="button" data-k="${m.k}" aria-pressed="false"><i style="display:inline-block;width:12px;height:3px;border-radius:2px;background:${m.c};vertical-align:middle;margin-right:6px"></i>${m.label}</button>`).join("")}</div></div>`;
+// 台股（代號開頭是數字，如 0050）用 20/60/120/240；美股用 20/50/100/200（TradingView 預設）
+const MA_SET = code => MA_DEF.map(m => ({...m, n: /^\d/.test(String(code || "")) ? m.tw : m.us}));
+const MA_SEG = (id, code) => `<div class="ctl"><span style="font-size:13px;color:var(--muted)">均線</span><div class="seg" data-ma="${id}">${MA_SET(code).map(m => `<button type="button" data-k="${m.k}" aria-pressed="false"><i style="display:inline-block;width:12px;height:3px;border-radius:2px;background:${m.c};vertical-align:middle;margin-right:6px"></i>${m.label}${m.n}</button>`).join("")}</div></div>`;
 function bindMaSeg(redraw) {
   document.querySelectorAll(".seg[data-ma]").forEach(seg => {
     const set = (drawRetrace.ma = drawRetrace.ma || {})[seg.dataset.ma] = new Set();
