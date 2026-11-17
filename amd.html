@@ -285,9 +285,9 @@ function syncPE() {
 }
 
 // 回補走勢圖改用共用的 retrace.js（與 ETF 頁同一套：時間範圍、均線開關、VPVR、量柱、MACD）
-// 情境模擬開關（模擬1／模擬2，可疊加、預設關）：路徑取自 data/amd_scenario.json，與下方「後續走勢情境」同一份
-const RSC = {s1: false, s2: false};
-const RSC_SEG = () => `<div class="ctl"><span style="font-size:13px;color:var(--muted)">情境模擬</span><div class="seg" id="rscseg">${SC.sets.map(C => `<button type="button" data-k="${C.key}" aria-pressed="false">${C.short}（${short(C.anchorDate)} 起）</button>`).join("")}</div></div>`;
+// 情境模擬開關（只有模擬2，預設關）：路徑取自 data/amd_scenario.json，與下方「後續走勢情境」同一份
+const RSC = {s2: false};   // 只提供情境模擬2
+const RSC_SEG = () => `<div class="ctl"><span style="font-size:13px;color:var(--muted)">情境模擬</span><div class="seg" id="rscseg">${SC.sets.filter(C => C.key in RSC).map(C => `<button type="button" data-k="${C.key}" aria-pressed="false">${C.short}（${short(C.anchorDate)} 起）</button>`).join("")}</div></div>`;
 const AMD_SCEN = () => SC.sets.filter(C => RSC[C.key]).flatMap(C => C.scenarios.map(s => ({
   color: s.color, tag: (SC.sets.filter(c => RSC[c.key]).length > 1 ? C.short + " " : "") + s.tag, label: C.short + "　" + s.legend, band: s.band,
   pts: [[C.anchorDate, C.anchor], ...s.path.map((v, k) => [C.days[k], v])]})));
