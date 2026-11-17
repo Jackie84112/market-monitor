@@ -107,7 +107,7 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
       g += `<text x="${ex + 6}" y="${ty + 4}" font-size="11" font-weight="700" fill="${s.color}" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${s.tag}</text>`;
     });
     if (blocks.length) {
-      const bx = W - R + 104, LH = 16;
+      const bx = W - R + 150, LH = 16;   // 回補位標籤（約 90px）右邊再空一段
       blocks.sort((a, b) => a.ey - b.ey);
       let floor = T;
       blocks.forEach(b => {
