@@ -197,7 +197,7 @@
 </div>
 <div id="tip"></div>
 
-<script src="retrace.js?v=20261117c"></script>
+<script src="retrace.js?v=20261117d"></script>
 <script>
 const $ = id => document.getElementById(id);
 const tip = $("tip");
@@ -285,7 +285,13 @@ function syncPE() {
 }
 
 // 回補走勢圖改用共用的 retrace.js（與 ETF 頁同一套：時間範圍、均線開關、VPVR、量柱、MACD）
-const AMD_DD = () => ({swing: A.swing, dec: 2, en: "AMD", code: "AMD", lowWord: "收盤低"});
+// 情境模擬開關（模擬1／模擬2，可疊加、預設關）：路徑取自 data/amd_scenario.json，與下方「後續走勢情境」同一份
+const RSC = {s1: false, s2: false};
+const RSC_SEG = () => `<div class="ctl"><span style="font-size:13px;color:var(--muted)">情境模擬</span><div class="seg" id="rscseg">${SC.sets.map(C => `<button type="button" data-k="${C.key}" aria-pressed="false">${C.short}（${short(C.anchorDate)} 起）</button>`).join("")}</div></div>`;
+const AMD_SCEN = () => SC.sets.filter(C => RSC[C.key]).flatMap(C => C.scenarios.map(s => ({
+  color: s.color, tag: (SC.sets.filter(c => RSC[c.key]).length > 1 ? C.short + " " : "") + s.tag, label: C.short + "　" + s.legend, band: s.band,
+  pts: [[C.anchorDate, C.anchor], ...s.path.map((v, k) => [C.days[k], v])]})));
+const AMD_DD = () => ({swing: A.swing, dec: 2, en: "AMD", code: "AMD", lowWord: "收盤低", scen: AMD_SCEN()});
 const drawAmdRetrace = () => drawRetrace($("rchart"), AMD_DD(), $("rlegend"));
 
 // 後續走勢情境：實線＝每日收盤（9/1 起，隨資料延伸）；虛線＝自情境起點（固定日）出發的三條示意路徑。
@@ -430,8 +436,9 @@ Promise.all([
   fetch("data/amd_pe.json", {cache: "no-store"}).then(r => r.json())
 ]).then(([a, s, sc, pe]) => {
   A = a; S = s; SC = sc; PE = pe;
-  $("rctl").outerHTML = MA_SEG("rchart", "AMD") + WIN_SEG("rchart");
+  $("rctl").outerHTML = MA_SEG("rchart", "AMD") + RSC_SEG() + WIN_SEG("rchart");
   bindMaSeg(drawAmdRetrace); bindWinSeg(drawAmdRetrace);
+  $("rscseg").onclick = e => { const b = e.target.closest && e.target.closest("button"); if (!b) return; const k = b.dataset.k; RSC[k] = !RSC[k]; b.classList.toggle("on", RSC[k]); b.setAttribute("aria-pressed", RSC[k]); drawAmdRetrace(); };
   render(); renderStatic(); syncSw(); drawScenario();
   $("vpseg").onclick = e => { const m = e.target.dataset && e.target.dataset.m; if (m) { VPM = m; $("vpseg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x.dataset.m === m)); drawAmdRetrace(); } };
   $("pesw").onclick = () => { PEST.on = !PEST.on; syncPE(); drawPE(); };

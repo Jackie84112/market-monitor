@@ -38,8 +38,14 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
     return {...m, pts: pts.map(p => idx[p[0]] ?? null)};
   }) : [];
   const maV = mas.flatMap(m => m.pts.filter(v => v != null));
-  const slots = Math.max(n, 8), pw = (W - L - R) / (slots - 1);
-  const vtop = Math.max(hi, ...pts.map(p => p[1]), ...maV), vbot = Math.min(lo, ...pts.map(p => p[1]), ...maV), X = i => L + pw * i, Y = v => T + PH * (1 - (v - vbot) / (vtop - vbot)), pc = v => (v - lo) / span * 100;
+  // 情境模擬（選用）：DD.scen = [{color, tag, label, band:[下,上], pts:[[日期, 價], ...]}]；X 軸往右延伸到情境最後一天，只畫落在圖窗內的點
+  const lastD = pts[n - 1][0], firstD = pts[0][0];
+  const scen = (DD.scen || []).map(s => ({...s, pts: s.pts.filter(p => p[0] >= firstD)})).filter(s => s.pts.length > 1);
+  const ext = [...new Set(scen.flatMap(s => s.pts.map(p => p[0])).filter(d => d > lastD))].sort();
+  const dIx = Object.fromEntries([...pts.map(p => p[0]), ...ext].map((d, i) => [d, i]));
+  const scV = scen.flatMap(s => [...s.pts.map(p => p[1]), ...(s.band || [])]);
+  const slots = Math.max(n + ext.length, 8), pw = (W - L - R) / (slots - 1);
+  const vtop = Math.max(hi, ...pts.map(p => p[1]), ...maV, ...scV), vbot = Math.min(lo, ...pts.map(p => p[1]), ...maV, ...scV), X = i => L + pw * i, Y = v => T + PH * (1 - (v - vbot) / (vtop - vbot)), pc = v => (v - lo) / span * 100;
   const vmax = vols ? Math.max(...vols) : 1, vbase = VB + VH, vbh = VH - 16, vbw = Math.min(pw * .5, 36), barH = v => Math.max(1, vbh * v / vmax);
   const fixed = sw.levels.slice(0, 3);
   const ACC = "#B04A2F", dec = DD.dec;
@@ -76,7 +82,28 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
     if (!dense || lab) g += `<line x1="${X(i)}" x2="${X(i)}" y1="${bottom}" y2="${bottom + 4}" stroke="#8C9096"/>`;
     if (lab && (i === n - 1 || X(n - 1) - X(i) >= 40)) g += `<text x="${X(i)}" y="${bottom + 17}" font-size="10.5" fill="#6B7178" text-anchor="middle">${short(p[0])}</text>`;
   });
+  ext.forEach((d, k) => {   // 情境延伸的日期：淡灰刻度
+    const i = n + k, lab = i % step === 0 || k === ext.length - 1;
+    if (lab && (k === ext.length - 1 || X(n + ext.length - 1) - X(i) >= 40) && X(i) - X(n - 1) >= 36) g += `<text x="${X(i)}" y="${bottom + 17}" font-size="10.5" fill="#B0B5BA" text-anchor="middle">${short(d)}</text>`;
+  });
   g += `<text x="${(L + W - R) / 2}" y="${bottom + 31}" font-size="10.5" fill="#9AA0A6" text-anchor="middle">交易日</text>`;
+  // 情境模擬：未來區段淡底、中性區間色帶、虛線路徑＋終點標籤（畫在收盤線下面）
+  if (scen.length) {
+    if (ext.length) g += `<rect x="${X(n - 1)}" y="${T}" width="${X(n + ext.length - 1) - X(n - 1)}" height="${PH}" fill="#E9E7E0" opacity=".45"/><text x="${X(n - 1) + 6}" y="${T + 12}" font-size="10.5" fill="#9AA0A6">情境模擬（示意）</text>`;
+    scen.forEach(s => {
+      const xs = s.pts.map(p => X(dIx[p[0]])), x0 = xs[0], x1 = xs[xs.length - 1];
+      if (s.band) g += `<rect x="${x0}" y="${Y(s.band[1])}" width="${x1 - x0}" height="${Y(s.band[0]) - Y(s.band[1])}" fill="${s.color}" opacity=".1"/>`;
+    });
+    const taken = [Y(hi), Y(lo), ...fixed.map(l => Y(l.v))];   // 右側已有的回補位標籤，終點標籤避開
+    scen.forEach(s => {
+      const d = s.pts.map((p, k) => (k ? "L" : "M") + X(dIx[p[0]]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(""), e = s.pts[s.pts.length - 1];
+      let ty = Y(e[1]);
+      for (let k = 0; k < 6; k++) { const c = taken.find(t => Math.abs(t - ty) < 13); if (c == null) break; ty = c + (ty >= c ? 13 : -13); }
+      taken.push(ty);
+      g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-dasharray="7 5"/><circle cx="${X(dIx[e[0]])}" cy="${Y(e[1])}" r="3.5" fill="${s.color}"/>
+        <text x="${X(dIx[e[0]]) + 6}" y="${ty + 4}" font-size="11" font-weight="700" fill="${s.color}" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${s.tag}</text>`;
+    });
+  }
   // 折線與點
   mas.forEach(m => {   // 均線畫在收盤線下面
     let d = "", pen = false;
@@ -173,7 +200,7 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   });
   svg.addEventListener("pointerdown", e => { const i = near(e), b_ = i < 0 ? vpHit(e) : null; if (i >= 0) show(i); else if (b_) showVp(b_); else hov.innerHTML = ""; });   // 觸控螢幕：點一下顯示
   svg.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") hov.innerHTML = ""; });
-  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span>${mas.map(m => { const last = [...m.pts].reverse().find(v => v != null); return `<span><i style="background:${m.c}"></i>${m.label}${m.n}（${m.n} 日均線）${last != null ? "最新 " + fmt(last, dec) : ""}</span>`; }).join("")}<span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vp ? `<span><i style="background:var(--chart);opacity:.4"></i>VPVR 成交量分布：${vm_ === "year" ? sw.vpYear.start.slice(0, 4) + " 整年（日線，只畫目前圖軸範圍內的量）" : "10/6 起（15 分 K）"}；滑鼠移到柱上顯示股價與回補位</span>` : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}`;
+  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span>${mas.map(m => { const last = [...m.pts].reverse().find(v => v != null); return `<span><i style="background:${m.c}"></i>${m.label}${m.n}（${m.n} 日均線）${last != null ? "最新 " + fmt(last, dec) : ""}</span>`; }).join("")}<span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vp ? `<span><i style="background:var(--chart);opacity:.4"></i>VPVR 成交量分布：${vm_ === "year" ? sw.vpYear.start.slice(0, 4) + " 整年（日線，只畫目前圖軸範圍內的量）" : "10/6 起（15 分 K）"}；滑鼠移到柱上顯示股價與回補位</span>` : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}${scen.map(s => `<span><i style="background:${s.color};height:0;border-top:2px dashed ${s.color}"></i>${s.label}</span>`).join("")}`;
 }
 
 // VPVR 範圍開關（格式同 amd.html）：10/6 起／2026 整年／關；每張圖各自記住選擇
