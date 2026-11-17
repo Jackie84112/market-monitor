@@ -22,7 +22,7 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   const W = Math.max(el.clientWidth, 280), narrow = W < 560;
   const st = (drawRetrace.st = drawRetrace.st || {})[el.id] = (drawRetrace.st || {})[el.id] || {vol: true, mac: true};   // 各面板展開狀態，重畫時保留
   const wideSc = !narrow && (DD.scen || []).some(s => s.text && s.text.length);   // 情境有說明文字時，右邊留一欄放「區間＋說明」
-  const L = 54, R = narrow ? 94 : wideSc ? 268 : 132, T = 16, PH = narrow ? 270 : 340, DH = 34, VG = 10, TB = 28;
+  const L = 54, R = narrow ? 94 : wideSc ? 206 : 132, T = 16, PH = narrow ? 270 : 340, DH = 34, VG = 10, TB = 28;
   const mac = hist ? hmac : (sw.macd && sw.macd.length === n ? sw.macd : null);
   const VH = vols && st.vol ? (narrow ? 78 : 92) : 0, MH = mac && st.mac ? (narrow ? 170 : 230) : 0;
   const VT = T + PH + DH + VG, VB = VT + TB, MT = VT + (vols ? TB + VH + VG : 0), MB = MT + TB;
@@ -107,7 +107,7 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
       g += `<text x="${ex + 6}" y="${ty + 4}" font-size="11" font-weight="700" fill="${s.color}" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${s.tag}</text>`;
     });
     if (blocks.length) {
-      const bx = W - R + 150, LH = 16;   // 回補位標籤（約 90px）右邊再空一段
+      const bx = W - 108, LH = 16;   // 說明欄貼齊最右邊，右邊界只留回補位標籤＋說明欄，情境帶盡量寬
       blocks.sort((a, b) => a.ey - b.ey);
       let floor = T;
       blocks.forEach(b => {
@@ -116,7 +116,7 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
       });
       blocks.forEach(b => {
         const cy = b.top + 11;
-        g += `<path d="M${b.ex} ${b.ey}L${W - R + 96} ${b.ey}L${bx - 4} ${cy - 4}" fill="none" stroke="${b.s.color}" stroke-width="1" opacity=".7"/>
+        g += `<path d="M${b.ex} ${b.ey}L${bx - 12} ${b.ey}L${bx - 4} ${cy - 4}" fill="none" stroke="${b.s.color}" stroke-width="1" opacity=".7"/>
           <rect x="${bx}" y="${b.top}" width="58" height="19" rx="5" fill="${b.s.color}"/><text x="${bx + 29}" y="${b.top + 13.5}" font-size="11.5" font-weight="700" fill="#fff" text-anchor="middle">${b.s.tag}</text>`
           + b.lines.map((t, k) => `<text x="${bx}" y="${b.top + 19 + LH * (k + 1) - 2}" font-size="12.5" font-weight="600" fill="#22262B">${t}</text>`).join("");
       });
