@@ -197,7 +197,7 @@
 </div>
 <div id="tip"></div>
 
-<script src="retrace.js?v=20261117d"></script>
+<script src="retrace.js?v=20261117e"></script>
 <script>
 const $ = id => document.getElementById(id);
 const tip = $("tip");
@@ -289,7 +289,7 @@ function syncPE() {
 const RSC = {s2: false};   // 只提供情境模擬2
 const RSC_SEG = () => `<div class="ctl"><span style="font-size:13px;color:var(--muted)">情境模擬</span><div class="seg" id="rscseg">${SC.sets.filter(C => C.key in RSC).map(C => `<button type="button" data-k="${C.key}" aria-pressed="false">${C.short}（${short(C.anchorDate)} 起）</button>`).join("")}</div></div>`;
 const AMD_SCEN = () => SC.sets.filter(C => RSC[C.key]).flatMap(C => C.scenarios.map(s => ({
-  color: s.color, tag: (SC.sets.filter(c => RSC[c.key]).length > 1 ? C.short + " " : "") + s.tag, label: C.short + "　" + s.legend, band: s.band,
+  color: s.color, text: s.text, tag: (SC.sets.filter(c => RSC[c.key]).length > 1 ? C.short + " " : "") + s.tag, label: C.short + "　" + s.legend, band: s.band,
   pts: [[C.anchorDate, C.anchor], ...s.path.map((v, k) => [C.days[k], v])]})));
 const AMD_DD = () => ({swing: A.swing, dec: 2, en: "AMD", code: "AMD", lowWord: "收盤低", scen: AMD_SCEN()});
 const drawAmdRetrace = () => drawRetrace($("rchart"), AMD_DD(), $("rlegend"));

@@ -21,7 +21,8 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   const n = pts.length, dense = n > 40, oi = pts.findIndex(p => p[0] === sw.low.date);
   const W = Math.max(el.clientWidth, 280), narrow = W < 560;
   const st = (drawRetrace.st = drawRetrace.st || {})[el.id] = (drawRetrace.st || {})[el.id] || {vol: true, mac: true};   // 各面板展開狀態，重畫時保留
-  const L = 54, R = narrow ? 94 : 132, T = 16, PH = narrow ? 270 : 340, DH = 34, VG = 10, TB = 28;
+  const wideSc = !narrow && (DD.scen || []).some(s => s.text && s.text.length);   // 情境有說明文字時，右邊留一欄放「區間＋說明」
+  const L = 54, R = narrow ? 94 : wideSc ? 268 : 132, T = 16, PH = narrow ? 270 : 340, DH = 34, VG = 10, TB = 28;
   const mac = hist ? hmac : (sw.macd && sw.macd.length === n ? sw.macd : null);
   const VH = vols && st.vol ? (narrow ? 78 : 92) : 0, MH = mac && st.mac ? (narrow ? 170 : 230) : 0;
   const VT = T + PH + DH + VG, VB = VT + TB, MT = VT + (vols ? TB + VH + VG : 0), MB = MT + TB;
@@ -94,15 +95,32 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
       const xs = s.pts.map(p => X(dIx[p[0]])), x0 = xs[0], x1 = xs[xs.length - 1];
       if (s.band) g += `<rect x="${x0}" y="${Y(s.band[1])}" width="${x1 - x0}" height="${Y(s.band[0]) - Y(s.band[1])}" fill="${s.color}" opacity=".1"/>`;
     });
-    const taken = [Y(hi), Y(lo), ...fixed.map(l => Y(l.v))];   // 右側已有的回補位標籤，終點標籤避開
+    const taken = [Y(hi), Y(lo), ...fixed.map(l => Y(l.v))];   // 右側已有的回補位標籤，終點標籤避開（窄版）
+    const blocks = [];   // 寬版：回補位標籤右邊再開一欄，放區間名稱＋說明（同下方後續走勢情境圖的文字），由上到下排開不重疊
     scen.forEach(s => {
-      const d = s.pts.map((p, k) => (k ? "L" : "M") + X(dIx[p[0]]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(""), e = s.pts[s.pts.length - 1];
-      let ty = Y(e[1]);
+      const d = s.pts.map((p, k) => (k ? "L" : "M") + X(dIx[p[0]]).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(""), e = s.pts[s.pts.length - 1], ex = X(dIx[e[0]]), ey = Y(e[1]);
+      g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-dasharray="7 5"/><circle cx="${ex}" cy="${ey}" r="3.5" fill="${s.color}"/>`;
+      if (wideSc) { blocks.push({s, ex, ey, lines: s.text || []}); return; }
+      let ty = ey;
       for (let k = 0; k < 6; k++) { const c = taken.find(t => Math.abs(t - ty) < 13); if (c == null) break; ty = c + (ty >= c ? 13 : -13); }
       taken.push(ty);
-      g += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-dasharray="7 5"/><circle cx="${X(dIx[e[0]])}" cy="${Y(e[1])}" r="3.5" fill="${s.color}"/>
-        <text x="${X(dIx[e[0]]) + 6}" y="${ty + 4}" font-size="11" font-weight="700" fill="${s.color}" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${s.tag}</text>`;
+      g += `<text x="${ex + 6}" y="${ty + 4}" font-size="11" font-weight="700" fill="${s.color}" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${s.tag}</text>`;
     });
+    if (blocks.length) {
+      const bx = W - R + 104, LH = 16;
+      blocks.sort((a, b) => a.ey - b.ey);
+      let floor = T;
+      blocks.forEach(b => {
+        const h = LH * (1 + b.lines.length);
+        b.top = Math.max(floor, Math.min(b.ey - h / 2, T + PH - h)); floor = b.top + h + 8;
+      });
+      blocks.forEach(b => {
+        const cy = b.top + 11;
+        g += `<path d="M${b.ex} ${b.ey}L${W - R + 96} ${b.ey}L${bx - 4} ${cy - 4}" fill="none" stroke="${b.s.color}" stroke-width="1" opacity=".7"/>
+          <rect x="${bx}" y="${b.top}" width="58" height="19" rx="5" fill="${b.s.color}"/><text x="${bx + 29}" y="${b.top + 13.5}" font-size="11.5" font-weight="700" fill="#fff" text-anchor="middle">${b.s.tag}</text>`
+          + b.lines.map((t, k) => `<text x="${bx}" y="${b.top + 19 + LH * (k + 1) - 2}" font-size="12.5" font-weight="600" fill="#22262B">${t}</text>`).join("");
+      });
+    }
   }
   // 折線與點
   mas.forEach(m => {   // 均線畫在收盤線下面
