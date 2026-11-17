@@ -94,30 +94,41 @@
     <p>[註6]：均線為收盤價簡單移動平均，台股與美股用各自慣用天數：0050 為月線20、季線60、半年線120、年線240；SOXX、QQQ、SPY 為月線20、季線50、半年線100、年線200（與 TradingView 預設一致）。顏色：月線橘、季線紫、半年線青綠、年線桃紅；用約兩年日線計算，回補段與各時間範圍都畫；四個按鈕可疊加，預設不畫，再點一次取消。均線只算到最新收盤日，不含盤中價。</p>
   </div></div>
 </div>
-<script src="retrace.js?v=20261117c"></script>
+<script src="retrace.js?v=20261117e"></script>
 <script>
 const $ = id => document.getElementById(id);
 const fmt = (v, d = 2) => v == null ? "—" : Number(v).toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
 const short = d => d ? d.slice(5).replace("-", "/") : "—";
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const KEYS = ["etf_0050", "etf_soxx", "etf_qqq", "etf_spy"];
-let DATA = [];
-function draw() { DATA.forEach((d, i) => drawRetrace($("rc" + i), d, $("rl" + i))); }
-Promise.all(KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).then(r => r.json()))).then(arr => {
+let DATA = [], SCN = {};
+// 情境模擬（同 AMD 頁）：data/etf_scenario.json 依資料檔名放各 ETF 的三條示意路徑；有設定的 ETF 才出現開關，預設關
+const SON = {};
+const scenOf = i => { const C = SCN[KEYS[i]]; return C && SON[i] ? C.scenarios.map(s => ({color: s.color, tag: s.tag, text: s.text, label: s.legend, band: s.band,
+  pts: [[C.anchorDate, C.anchor], ...s.path.map((v, k) => [C.days[k], v])]})) : []; };
+const dd = i => ({...DATA[i], scen: scenOf(i)});
+const redraw = i => drawRetrace($("rc" + i), dd(i), $("rl" + i));
+function draw() { DATA.forEach((d, i) => redraw(i)); }
+const SC_SEG = i => { const C = SCN[KEYS[i]]; return C ? `<div class="ctl"><span style="font-size:13px;color:var(--muted)">情境模擬</span><div class="seg" data-sc="${i}"><button type="button" aria-pressed="false">${C.short || "模擬"}（${short(C.anchorDate)} 起）</button></div></div>` : ""; };
+Promise.all([...KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).then(r => r.json())),
+  fetch("data/etf_scenario.json", {cache: "no-store"}).then(r => r.ok ? r.json() : {}).catch(() => ({}))]).then(all => {
+  const arr = all.slice(0, KEYS.length); SCN = all[KEYS.length] || {};
   DATA = arr;
   $("cards").innerHTML = arr.map((d, i) => {
     const sw = d.swing;
     return `<section class="card"><div class="head"><h2>${esc(d.name)}（${esc(d.code)}）</h2><span>${short(sw.high.date)} 收盤高點至 ${short(sw.low.date)} 收盤低點；以收盤低點為原點，之後每日收盤；資料日 ${d.asof.replace(/-/g, "/")}</span></div>
-      ${VP_SEG("rc" + i).replace(/<\/div>$/, MA_SEG("rc" + i, d.code) + WIN_SEG("rc" + i) + "</div>")}
+      ${VP_SEG("rc" + i).replace(/<\/div>$/, MA_SEG("rc" + i, d.code) + SC_SEG(i) + WIN_SEG("rc" + i) + "</div>")}
       <div id="rc${i}" style="width:100%"></div><div class="legend" id="rl${i}"></div></section>`;
   }).join("");
   const asof = arr.map(d => d.asof).sort().pop();
   $("sub").textContent = `0050、SOXX、QQQ、SPY　｜　最新資料日：${asof.replace(/-/g, "/")}　｜　資料更新：${arr[0].updated}（台灣時間）`;
   $("st").innerHTML = arr.map(d => { const s = d.status.Yahoo;
     return `<span class="chip ${s.ok ? "" : "r"}" title="${s.err ? esc(s.err) : ""}">${esc(d.code)} ${s.ok ? "至" : "抓取失敗，沿用至"} ${short(s.asof)}</span>`; }).join("");
-  bindVpSeg(id => { const i = +id.slice(2); drawRetrace($(id), DATA[i], $("rl" + i)); });
-  bindWinSeg(id => { const i = +id.slice(2); drawRetrace($(id), DATA[i], $("rl" + i)); });
-  bindMaSeg(id => { const i = +id.slice(2); drawRetrace($(id), DATA[i], $("rl" + i)); });
+  bindVpSeg(id => redraw(+id.slice(2)));
+  bindWinSeg(id => redraw(+id.slice(2)));
+  bindMaSeg(id => redraw(+id.slice(2)));
+  document.querySelectorAll(".seg[data-sc]").forEach(seg => seg.onclick = () => { const i = +seg.dataset.sc, b = seg.querySelector("button");
+    SON[i] = !SON[i]; b.classList.toggle("on", SON[i]); b.setAttribute("aria-pressed", SON[i]); redraw(i); });
   draw();
   let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(draw, 150); });
 }).catch(e => { $("sub").innerHTML = `<span style="color:#C02323">資料讀取失敗：${e}</span>`; console.error(e); });
