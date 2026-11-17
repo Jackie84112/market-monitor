@@ -459,7 +459,7 @@ function drawScenario() {
       if (s.band && !thin) g += `<rect x="${ax}" y="${Y(s.band[1])}" width="${ex - ax}" height="${Y(s.band[0]) - Y(s.band[1])}" fill="${s.color}" opacity=".1"/>`;
       g += `<path d="${pts.map((p, k) => (k ? "L" : "M") + p[0].toFixed(1) + " " + p[1].toFixed(1)).join("")}" fill="none" stroke="${s.color}" stroke-width="${thin ? 1.8 : 2.6}" stroke-dasharray="${thin ? "2 4" : "7 5"}" stroke-linejoin="round"/><circle cx="${last[0]}" cy="${last[1]}" r="${thin ? 3.5 : 4.5}" fill="${s.color}"/>`;
       if (!isP) return;
-      const by = last[1] + (narrow ? s.dy * .6 : s.dy), bx = last[0] + 14, bw = narrow ? 54 : 62;
+      const by = last[1] + (narrow ? s.dy * .6 : s.dy), bx = last[0] + 14, bw = narrow ? 64 : 74;
       g += `<line x1="${last[0]}" y1="${last[1]}" x2="${bx}" y2="${by}" stroke="${s.color}" stroke-width="1"/><rect x="${bx}" y="${by - 12}" width="${bw}" height="24" rx="6" fill="${s.color}"/><text x="${bx + bw / 2}" y="${by + 5}" font-size="12.5" font-weight="700" fill="#fff" text-anchor="middle">${s.tag}</text>`;
       if (!narrow) g += s.text.map((t, k) => `<text x="${bx + bw + 10}" y="${by + 5 + (k - (s.text.length - 1) / 2) * 19}" font-size="14" font-weight="600" fill="#22262B">${t}</text>`).join("");
     });
