@@ -26,6 +26,10 @@ TW = dt.timezone(dt.timedelta(hours=8))
 TWSE_DELAY = 1.5   # 證交所限流，勿低於 1.4 秒
 KEEP = 180         # 每條序列保留的筆數
 PEAK_DATE = "2026-10-06"    # 回補關卡統一起算的高點日（換波段時手動改）
+# 回補原點（0%）固定日期，不隨之後的新低移動；再跌破就顯示負數（2026-11-18 使用者定案）。換波段時手動改
+# 美股 11/5 大跌，亞股（0050、KOSPI）反應在隔天 11/6（與 ETF 子頁 0050 一致）
+LOW_DATE = {"us": "2026-11-05", "asia": "2026-11-06"}
+ASIA_KEYS = {"t0050", "kospi"}
 CHART_START = "2026-06-01"  # 指數走勢圖起始日
 RETRACE = (0.382, 0.5, 0.618)
 # Put/Call 事件對照：最後一個是本次（頁面以強調色畫），新增事件往後加
@@ -374,11 +378,13 @@ def update_store(backfill):
 
 
 # ---------------------------------------------------------------- 計算
-def index_position(rows, live):
-    """高點＝PEAK_DATE 收盤（休市則取前一交易日）；前低＝該日之後最低收盤。盤中那筆只顯示，不進高低點計算。"""
+def index_position(rows, live, low_date):
+    """高點＝PEAK_DATE 收盤；原點（前低）＝low_date 收盤（休市皆取前一交易日），固定不動，之後跌破則回補為負。盤中那筆只顯示，不進高低點計算。"""
     done = rows[:-1] if live else rows
     peak = [r for r in done if r[0] <= PEAK_DATE][-1]
-    low = min((r for r in done if r[0] >= peak[0]), key=lambda x: x[1])
+    low = [r for r in done if r[0] <= low_date][-1]
+    if low[1] >= peak[1]:   # 原點不低於高點（道瓊 11/5 收盤高於 10/6）→ 暫退回高點後最低收盤，待使用者決定
+        low = min((r for r in done if r[0] >= peak[0]), key=lambda x: x[1])
     last = rows[-1]
     prev = done[-1][1] if live else done[-2][1]
     pct = lambda a, b: round((a / b - 1) * 100, 2)
@@ -542,7 +548,7 @@ def main():
     indices = []
     for k, n, sym in INDICES:
         if S(k):
-            indices.append({"key": k, "name": n, "sym": sym, "series": [[d, round(v, 2)] for d, v in S(k) if d >= CHART_START], **index_position(S(k), bool(live.get(k)))})
+            indices.append({"key": k, "name": n, "sym": sym, "series": [[d, round(v, 2)] for d, v in S(k) if d >= CHART_START], **index_position(S(k), bool(live.get(k)), LOW_DATE["asia" if k in ASIA_KEYS else "us"])})
 
     try:
         pcev = pc_events(store)

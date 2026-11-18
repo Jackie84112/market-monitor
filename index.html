@@ -319,8 +319,8 @@ function idxRetrace(x) {
 }
 function drawIdxDetail(tr) {
   const x = DATA.indices.find(y => y.key === tr.dataset.i), td = tr.firstChild;
-  if (!td.firstChild) td.innerHTML = `<div class="dt-t">${esc(x.name)} 回補走勢：以收盤低點為原點，之後每日收盤；滑鼠移到點上顯示該日回補水位${idxPre(x).length ? `（${short(x.low[0])} 剛創本波新低，原點前補上跌下來的走勢）` : ""}</div><div id="ir_${x.key}" style="width:100%"></div><div class="legend" id="il_${x.key}"></div>
-    <div class="notes"><p>[註]：高低點取收盤價（與上表一致）；回補位 = 低點 + 比例 ×（高點 − 低點），38.2%、50%、61.8% 為常用比例，不具預測力。</p></div>`;
+  if (!td.firstChild) td.innerHTML = `<div class="dt-t">${esc(x.name)} 回補走勢：以 ${short(x.low[0])} 收盤為原點（0%），之後每日收盤，跌破原點為負；滑鼠移到點上顯示該日回補水位</div><div id="ir_${x.key}" style="width:100%"></div><div class="legend" id="il_${x.key}"></div>
+    <div class="notes"><p>[註1]：高點＝${short(x.peak[0])} 收盤、原點＝${short(x.low[0])} 收盤，兩者固定不隨之後的新低移動（亞股以美股大跌隔天為原點）；回補位 = 低點 + 比例 ×（高點 − 低點），38.2%、50%、61.8% 為常用比例，不具預測力。</p></div>`;
   drawRetrace($("ir_" + x.key), idxRetrace(x), $("il_" + x.key));
 }
 let DATA;
@@ -357,7 +357,7 @@ fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json()).then(j => {
       <td class="n ${cls(x.chg)}" data-l="當日">${sign(x.chg, 2, "%")}</td>
       <td class="n ${cls(x.fromPeak)}" data-l="距高點">${sign(x.fromPeak, 1, "%")}</td>
       <td class="n ${cls(x.fromLow)}" data-l="距前低">${sign(x.fromLow, 1, "%")}</td>
-      <td data-l="回補進度"><span><span class="rt"><i style="width:${Math.max(0, Math.min(100, x.retrace ?? 0))}%"></i>${ticks}</span><span class="rtv">${x.retrace == null ? "—" : fmt(x.retrace, 0) + "%"}</span></span></td>
+      <td data-l="回補進度"><span><span class="rt"><i style="width:${Math.max(0, Math.min(100, x.retrace ?? 0))}%"></i>${ticks}</span><span class="rtv">${x.retrace == null ? "—" : fmt(x.retrace, Math.abs(x.retrace) < 1 && x.retrace !== 0 ? 1 : 0) + "%"}</span></span></td>
       <td class="n" data-l="下一關卡">${x.next ? `${x.next.name} ${fmt(x.next.v, d)} <small>${sign(x.next.dist, 1, "%")}</small>` : "—"}</td>
       <td class="n" data-l="大跌前收盤">${x.gap ? `${fmt(x.gap.v, d)} <small>${short(x.gap.date)} ${sign(x.gap.drop, 1, "%")}</small>` : "—"}</td></tr>
       <tr class="detail" data-i="${x.key}"><td colspan="8"></td></tr>`;
