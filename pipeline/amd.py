@@ -47,6 +47,30 @@ LEVELS = [
 ]
 
 
+def twse_days(stock, dates):
+    """證交所 STOCK_DAY（整月、民國日期）取指定日期的 {d,o,h,l,c,v}；查不到（休市、當天尚未公布）就略過。"""
+    out, months = {}, {}
+    for d in dates:
+        months.setdefault(d[:7], []).append(d)
+    for ym, ds in months.items():
+        try:
+            r = requests.get("https://www.twse.com.tw/rwd/zh/afterTrading/STOCK_DAY",
+                             params={"date": ym.replace("-", "") + "01", "stockNo": stock, "response": "json"}, headers=UA, timeout=40)
+            data = r.json().get("data") or []
+        except Exception:
+            continue
+        f = lambda x: float(str(x).replace(",", ""))
+        for row in data:
+            y, m, dd = row[0].split("/")
+            iso = f"{int(y) + 1911}-{m}-{dd}"
+            if iso in ds:
+                try:
+                    out[iso] = {"d": iso, "o": f(row[3]), "h": f(row[4]), "l": f(row[5]), "c": f(row[6]), "v": f(row[1])}
+                except ValueError:
+                    pass
+    return out
+
+
 def daily(sym, rng="2y"):
     """回傳 (日線列 [{d,o,h,l,c,v}], 是否盤中, 最新成交時間)。日期為交易所當地日期。"""
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{requests.utils.quote(sym)}?range={rng}&interval=1d"
@@ -54,13 +78,18 @@ def daily(sym, rng="2y"):
     r.raise_for_status()
     j = r.json()["chart"]["result"][0]
     m, q, off = j["meta"], j["indicators"]["quote"][0], j["meta"].get("gmtoffset", 0)
-    rows = {}
+    rows, holes = {}, []
     for i, t in enumerate(j["timestamp"]):
         o, h, l, c, v = (q[k][i] for k in ("open", "high", "low", "close", "volume"))
-        if None in (o, h, l, c):
-            continue
         d = dt.datetime.fromtimestamp(t + off, dt.timezone.utc).strftime("%Y-%m-%d")
+        if None in (o, h, l, c):
+            if sym.endswith(".TW"):
+                holes.append(d)
+            continue
         rows[d] = {"d": d, "o": o, "h": h, "l": l, "c": c, "v": v or 0}
+    # 台股：Yahoo 日線中間偶有收盤 null（如 0050 2026-11-17），用證交所 STOCK_DAY 官方開高低收量補
+    for d, r in twse_days(sym[:-3], holes).items():
+        rows.setdefault(d, r)
     out = [rows[d] for d in sorted(rows)]
     # Yahoo 日線有時最新一根收盤為 null（如 0050 2026-11-17），但 meta 已有當日成交 → 用 meta 補一根
     mt, mp = m.get("regularMarketTime"), m.get("regularMarketPrice")
