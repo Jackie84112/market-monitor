@@ -304,15 +304,22 @@ function drawDetail(tr) {
 }
 
 // 指數列展開：用共用的回補走勢圖（不加量與 MACD）；高低點取收盤價，與上表一致
+// 剛創新低（低點後不到 5 個交易日）時，原點前補上跌下來的走勢，湊滿約 10 個交易日（最早到高點日）
+function idxPre(x) {
+  const after = x.series.filter(p => p[0] > x.low[0]).length;
+  if (after >= 5) return [];
+  const before = x.series.filter(p => p[0] < x.low[0] && p[0] >= x.peak[0]);
+  return before.slice(Math.max(0, before.length - (10 - after - 1))).map(p => [p[0], p[1]]);
+}
 function idxRetrace(x) {
   const d = x.last < 1000 ? 2 : 0;
   return {en: x.name, dec: d, lowWord: "收盤低", swing: {high: {date: x.peak[0], v: x.peak[1]}, low: {date: x.low[0], v: x.low[1]},
-    path: x.series.filter(p => p[0] > x.low[0]).map(p => [p[0], p[1]]),
+    pre: idxPre(x), path: x.series.filter(p => p[0] > x.low[0]).map(p => [p[0], p[1]]),
     levels: x.levels.slice(0, 3).map(l => ({name: l.name, v: l.v}))}};
 }
 function drawIdxDetail(tr) {
   const x = DATA.indices.find(y => y.key === tr.dataset.i), td = tr.firstChild;
-  if (!td.firstChild) td.innerHTML = `<div class="dt-t">${esc(x.name)} 回補走勢：以收盤低點為原點，之後每日收盤；滑鼠移到點上顯示該日回補水位</div><div id="ir_${x.key}" style="width:100%"></div><div class="legend" id="il_${x.key}"></div>
+  if (!td.firstChild) td.innerHTML = `<div class="dt-t">${esc(x.name)} 回補走勢：以收盤低點為原點，之後每日收盤；滑鼠移到點上顯示該日回補水位${idxPre(x).length ? `（${short(x.low[0])} 剛創本波新低，原點前補上跌下來的走勢）` : ""}</div><div id="ir_${x.key}" style="width:100%"></div><div class="legend" id="il_${x.key}"></div>
     <div class="notes"><p>[註]：高低點取收盤價（與上表一致）；回補位 = 低點 + 比例 ×（高點 − 低點），38.2%、50%、61.8% 為常用比例，不具預測力。</p></div>`;
   drawRetrace($("ir_" + x.key), idxRetrace(x), $("il_" + x.key));
 }

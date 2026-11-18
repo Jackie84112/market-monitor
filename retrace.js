@@ -14,9 +14,11 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
     pts = sl.map(h => [h[0], h[1]]); vols = sl.map(h => h[2]); chgs = sl.map(h => h[3]); hmac = sl.map(h => [h[0], h[4], h[5], h[6]]);
   } else {
     const path0 = sw.path || [];
-    pts = [[sw.low.date, lo], ...path0.map(p => [p[0], p[1]])];
-    vols = sw.lowVol != null && path0.every(p => p[2] != null) ? [sw.lowVol, ...path0.map(p => p[2])] : null;
-    chgs = [sw.lowChg, ...path0.map(p => p[3])];
+    // sw.pre（選用）：低點前的收盤 [[日期, 收盤]]，剛創新低、回補段太短時接在原點前面，看得到跌下來的那一段（不畫量）
+    const pre = sw.pre || [];
+    pts = [...pre.map(p => [p[0], p[1]]), [sw.low.date, lo], ...path0.map(p => [p[0], p[1]])];
+    vols = !pre.length && sw.lowVol != null && path0.every(p => p[2] != null) ? [sw.lowVol, ...path0.map(p => p[2])] : null;
+    chgs = [...pre.map(() => null), sw.lowChg, ...path0.map(p => p[3])];
   }
   const n = pts.length, dense = n > 40, oi = pts.findIndex(p => p[0] === sw.low.date);
   const W = Math.max(el.clientWidth, 280), narrow = W < 560;
