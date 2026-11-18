@@ -39,8 +39,8 @@ PC_WIN = (-5, 10)   # 事件日前 5、後 10 個交易日
 PC_LOOKBACK = 252   # 百分位：與前 252 個交易日（約一年）比
 
 INDICES = [("spx", "S&P 500", "^GSPC"), ("ndx", "Nasdaq-100", "^NDX"), ("sox", "費城半導體 SOX", "^SOX"),
-           ("t0050", "元大台灣 50（0050）", "0050.TW"), ("kospi", "韓國 KOSPI", "^KS11"),
-           ("dji", "道瓊工業", "^DJI")]  # 道瓊與觀察標的相關性低，排最後
+           ("t0050", "元大台灣 50（0050）", "0050.TW"), ("kospi", "韓國 KOSPI", "^KS11")]
+# 道瓊 2026-11-18 使用者要求移除（10/6 收盤低於 11/5 原點，高低倒置算不出回補）
 FUTURES = [("es", "S&P 500 期貨", "ES=F"), ("nq", "Nasdaq-100 期貨", "NQ=F"), ("ym", "道瓊期貨", "YM=F"), ("soxf", "費城半導體 SOX 期貨", "SOX=F")]
 BOND_ETF = [("b00679", "00679B 元大美債 20 年", "00679B.TWO"), ("b00687", "00687B 國泰 20 年美債", "00687B.TWO"),
             ("b00720", "00720B 元大投資級公司債", "00720B.TWO"), ("b00937", "00937B 群益 ESG 投等債 20+", "00937B.TWO")]
@@ -383,8 +383,6 @@ def index_position(rows, live, low_date):
     done = rows[:-1] if live else rows
     peak = [r for r in done if r[0] <= PEAK_DATE][-1]
     low = [r for r in done if r[0] <= low_date][-1]
-    if low[1] >= peak[1]:   # 原點不低於高點（道瓊 11/5 收盤高於 10/6）→ 暫退回高點後最低收盤，待使用者決定
-        low = min((r for r in done if r[0] >= peak[0]), key=lambda x: x[1])
     last = rows[-1]
     prev = done[-1][1] if live else done[-2][1]
     pct = lambda a, b: round((a / b - 1) * 100, 2)
@@ -454,7 +452,7 @@ def main():
 
     fetch_yahoo(list(ysyms))
     # Yahoo 各商品更新有先後：同市場內若有序列落後同組最新日，等一下重抓（最多 4 輪）。期貨與匯率 24 小時交易，不比對
-    groups = [["spx", "ndx", "sox", "dji", "vix", "vix3m", "spy", "rsp", "tsm"],
+    groups = [["spx", "ndx", "sox", "vix", "vix3m", "spy", "rsp", "tsm"],
               ["t0050", "t2330", "b00679", "b00687", "b00720", "b00937"]]
     for attempt in range(4):
         stale = []
