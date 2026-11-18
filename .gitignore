@@ -1,3 +1,4 @@
 __pycache__/
 *.pyc
 *.bak*
+pipeline/run_update.log

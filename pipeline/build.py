@@ -89,6 +89,12 @@ def yahoo(sym, adjusted=False):
             out[d] = v
         except Exception:
             pass
+    # 最新一根收盤 null 但 meta 已有當日成交（2026-11-17 全面出現）→ 用 meta 補（最新一根不會有除息調整，adjusted 同值）
+    mt, mp = m.get("regularMarketTime"), m.get("regularMarketPrice")
+    if mt and mp:
+        md = day(mt)
+        if not out or md > max(out):
+            out[md] = mp
     rows = [[d, v] for d, v in sorted(out.items())]
     per, now = (m.get("currentTradingPeriod") or {}).get("regular") or {}, time.time()
     live = bool(per) and per["start"] <= now < per["end"] and rows[-1][0] == dt.datetime.fromtimestamp(now + off, dt.timezone.utc).strftime("%Y-%m-%d")

@@ -62,7 +62,24 @@ def daily(sym, rng="2y"):
         d = dt.datetime.fromtimestamp(t + off, dt.timezone.utc).strftime("%Y-%m-%d")
         rows[d] = {"d": d, "o": o, "h": h, "l": l, "c": c, "v": v or 0}
     out = [rows[d] for d in sorted(rows)]
-    per, now = (m.get("currentTradingPeriod") or {}).get("regular") or {}, time.time()
+    # Yahoo 日線有時最新一根收盤為 null（如 0050 2026-11-17），但 meta 已有當日成交 → 用 meta 補一根
+    mt, mp = m.get("regularMarketTime"), m.get("regularMarketPrice")
+    if mt and mp and m.get("regularMarketDayHigh") and m.get("regularMarketDayLow"):
+        md = dt.datetime.fromtimestamp(mt + off, dt.timezone.utc).strftime("%Y-%m-%d")
+        if not out or md > out[-1]["d"]:
+            o = None
+            try:   # 開盤價：取當日 5 分 K 第一根
+                u5 = f"https://query1.finance.yahoo.com/v8/finance/chart/{requests.utils.quote(sym)}?range=5d&interval=5m"
+                j5 = requests.get(u5, headers=UA, timeout=40).json()["chart"]["result"][0]
+                for t5, o5 in zip(j5["timestamp"], j5["indicators"]["quote"][0]["open"]):
+                    if o5 is not None and dt.datetime.fromtimestamp(t5 + off, dt.timezone.utc).strftime("%Y-%m-%d") == md:
+                        o = o5
+                        break
+            except Exception:
+                pass
+            out.append({"d": md, "o": o if o is not None else (out[-1]["c"] if out else mp), "h": m["regularMarketDayHigh"],
+                        "l": m["regularMarketDayLow"], "c": mp, "v": m.get("regularMarketVolume") or 0})
+    per, now =(m.get("currentTradingPeriod") or {}).get("regular") or {}, time.time()
     live = bool(per) and per["start"] <= now < per["end"] and out[-1]["d"] == dt.datetime.fromtimestamp(now + off, dt.timezone.utc).strftime("%Y-%m-%d")
     return out, live, m.get("regularMarketTime")
 
