@@ -347,7 +347,9 @@ def pc_events(store):
                    for off in range(PC_WIN[0], PC_WIN[1] + 1) if 0 <= e + off < len(ds)]
             if pts:
                 evs.append({"name": name, "date": ds[e], "current": i_ev == len(PC_EVENTS) - 1, "pts": pts})
-        out[key] = {"pool": {"start": ds[0], "end": ds[-1], "n": len(vs), "p10": q(.1), "p50": q(.5), "p90": q(.9)},
+        # p25–p75＝頁面「平常大約」；p5／p95 以外＝過高／過低（2026-11-19 使用者同意的高低判斷）
+        out[key] = {"pool": {"start": ds[0], "end": ds[-1], "n": len(vs), "p5": q(.05), "p10": q(.1), "p25": q(.25),
+                             "p50": q(.5), "p75": q(.75), "p90": q(.9), "p95": q(.95)},
                     "events": evs}
     return out
 
