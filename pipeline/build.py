@@ -62,6 +62,22 @@ def num(s):
 
 
 # ---------------------------------------------------------------- Yahoo
+def naver_kospi(pages=8):
+    """Naver 行動版 KOSPI 日線 {日期: 收盤}；每頁 20 筆（pageSize 太大會回空），8 頁約 160 個交易日。"""
+    out = {}
+    for p in range(1, pages + 1):
+        r = requests.get(f"https://m.stock.naver.com/api/index/KOSPI/price?pageSize=20&page={p}", headers=UA, timeout=30)
+        r.raise_for_status()
+        rows = r.json()
+        if not rows:
+            break
+        for x in rows:
+            v = num(x.get("closePrice"))
+            if v is not None:
+                out[x["localTradedAt"]] = v
+    return out
+
+
 def yahoo(sym, adjusted=False):
     """回傳 (序列 [[日期, 值]...], 是否盤中, 最新成交時間)。日期為交易所當地日期。"""
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{requests.utils.quote(sym)}?range=1y&interval=1d"
@@ -91,6 +107,14 @@ def yahoo(sym, adjusted=False):
                 k = next(k for k in range(i + 1, len(q)) if q[k] and adj[k])
                 v *= adj[k] / q[k]
             out[d] = v
+        except Exception:
+            pass
+    # Yahoo KOSPI 日線偶有整天收盤 null（如 2026-11-18），用 Naver 官方日收盤補缺日（不覆蓋 Yahoo 既有值）
+    if sym == "^KS11" and out:
+        try:
+            for d, v in naver_kospi().items():
+                if d not in out and d < max(out):
+                    out[d] = v
         except Exception:
             pass
     # 最新一根收盤 null 但 meta 已有當日成交（2026-11-17 全面出現）→ 用 meta 補（最新一根不會有除息調整，adjusted 同值）
