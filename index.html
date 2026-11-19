@@ -292,10 +292,10 @@ function drawEvents(td, r, pe) {
   const ymd = s => s.replace(/-/g, "/");
   td.innerHTML = `<div class="dt-t">事件對照：事件日前 5 至後 10 個交易日；百分位全部事件用同一段歷史（${ymd(P.start)}–${ymd(P.end)}，${P.n} 個交易日）排名，100＝期間最高</div>
     <table class="ev-tb"><thead><tr><th>事件</th><th class="n">下跌前（SOX 高點）</th><th class="n">事件日（最恐慌）</th><th class="n">最新／期末</th></tr></thead><tbody>${evs.map(e => {
-      const z = e.pts.find(p => p[0] === 0), last = e.pts[e.pts.length - 1], md = s => s.slice(5).replace("-", "/");
+      const z = e.pts.find(p => p[0] === 0), last = e.pts[e.pts.length - 1];
       const cell = p => `${fmt(p[2], d)}${u} <span class="pc">${p[1]}%</span>`;
       return `<tr${e.current ? ' class="cur"' : ""}><td>${esc(e.name)}</td>
-        <td class="n">${e.pre ? `${fmt(e.pre[2], d)}${u} <span class="pc">${e.pre[1]}%</span> <small>${md(e.pre[0])}</small>` : "—"}</td>
+        <td class="n">${e.pre ? `${fmt(e.pre[2], d)}${u} <span class="pc">${e.pre[1]}%</span>` : "—"}</td>
         <td class="n">${z ? cell(z) : "—"} <small>${ymd(e.date).slice(2)}</small></td><td class="n">${cell(last)} <small>${last[0] >= 0 ? "+" : ""}${last[0]} 日</small></td></tr>`;
     }).join("")}</tbody></table>
     <div class="dt-t" style="margin-top:6px">[註1]：灰色百分比＝該數值在上述同一段歷史中的百分位，各事件可直接比較；舊事件的排名用到事件之後的資料，只適合事後對照，不是當時看得到的訊號。</div>
