@@ -299,10 +299,7 @@ function drawEvents(td, r, pe) {
       return `<tr${e.current ? ' class="cur"' : ""}><td>${esc(e.name)}</td>
         <td class="n">${e.pre ? `${fmt(e.pre[2], d)}${u} <span class="pc">${e.pre[1]}%</span>` : "—"}</td>
         <td class="n">${z ? cell(z) : "—"}</td><td class="n">${cell(last)}<div class="bk">${e.back == null ? "當天未超出平常" : e.back < 0 ? "尚未退回平常" : `${e.back} 個交易日後退回平常${e.again ? "，又回升" : ""}`}</div></td></tr>`;
-    }).join("")}</tbody></table>
-    <div class="dt-t" style="margin-top:6px">[註1]：灰色百分比＝該數值在上述同一段歷史中的百分位，各事件可直接比較；舊事件的排名用到事件之後的資料，只適合事後對照，不是當時看得到的訊號。</div>
-    <div class="dt-t">[註2]：下跌前＝SOX 前高那天；事件日＝最恐慌那天；兩者只用來比較，不是買賣訊號。「退回平常」＝事件日後第一次回到平常範圍上緣（${fmt(P.p75, d)}）以下。</div>
-    <div class="dt-t">[註3]：同一段歷史的第 10／50／90 百分位為 ${fmt(P.p10, d)}／${fmt(P.p50, d)}／${fmt(P.p90, d)}。</div>`;
+    }).join("")}</tbody></table>`;
 }
 
 function drawDetail(tr) {
