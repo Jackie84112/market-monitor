@@ -36,7 +36,6 @@ RETRACE = (0.382, 0.5, 0.618)
 PC_EVENTS = [("川普關稅", "2025-04-08"), ("Burry 放空", "2025-11-20"), ("美伊戰爭", "2026-03-30"),
              ("去槓桿", "2026-07-29"), ("CDS＋民主黨勝選", "2026-11-05")]
 PC_WIN = (-5, 10)   # 事件日前 5、後 10 個交易日
-PC_LOOKBACK = 252   # 百分位：與前 252 個交易日（約一年）比
 
 INDICES = [("spx", "S&P 500", "^GSPC"), ("ndx", "Nasdaq-100", "^NDX"), ("sox", "費城半導體 SOX", "^SOX"),
            ("t0050", "元大台灣 50（0050）", "0050.TW"), ("kospi", "韓國 KOSPI", "^KS11")]
@@ -327,26 +326,29 @@ def pc_events(store):
                 hist[src].setdefault(d, {}).update(got)
         hist[src] = dict(sorted(hist[src].items()))
     PC_HIST.write_text(json.dumps(hist, separators=(",", ":")), encoding="utf-8")
+    # 2026-11-19 使用者要求：各事件改用「同一把尺」比較。原本每個事件比自己前 252 日，基準期不同無法互比；
+    # 改成全部事件都對 pc_history 全期（2024/3 起至今）同一個分布算百分位，並輸出原始值供疊圖
     out = {}
     for key, src, k in (("pc_total", "cboe", "total"), ("pc_equity", "cboe", "equity"), ("pc_index", "cboe", "index"),
                         ("pc_tw_oi", "taifex", "oi"), ("pc_tw_vol", "taifex", "vol")):
         ds = [d for d, v in hist[src].items() if v.get(k) is not None]
         vs = [hist[src][d][k] for d in ds]
+        if not vs:
+            continue
+        srt = sorted(vs)
+        cpct = lambda x: round(100 * bisect.bisect_right(srt, x) / len(srt))
+        q = lambda p: srt[min(len(srt) - 1, int(p * (len(srt) - 1) + 0.5))]
         evs = []
         for i_ev, (name, date) in enumerate(PC_EVENTS):
             e = bisect.bisect_right(ds, date) - 1   # 事件日當天，休市則取前一個交易日
             if e < 0:
                 continue
-            pts = []
-            for off in range(PC_WIN[0], PC_WIN[1] + 1):
-                i = e + off
-                if i < PC_LOOKBACK or i >= len(ds):
-                    continue
-                prev = vs[i - PC_LOOKBACK:i]
-                pts.append([off, round(100 * sum(p <= vs[i] for p in prev) / len(prev)), vs[i], ds[i]])
+            pts = [[off, cpct(vs[e + off]), vs[e + off], ds[e + off]]
+                   for off in range(PC_WIN[0], PC_WIN[1] + 1) if 0 <= e + off < len(ds)]
             if pts:
                 evs.append({"name": name, "date": ds[e], "current": i_ev == len(PC_EVENTS) - 1, "pts": pts})
-        out[key] = evs
+        out[key] = {"pool": {"start": ds[0], "end": ds[-1], "n": len(vs), "p10": q(.1), "p50": q(.5), "p90": q(.9)},
+                    "events": evs}
     return out
 
 
