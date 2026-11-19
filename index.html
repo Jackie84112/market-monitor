@@ -78,21 +78,6 @@
   .ev-tb tbody tr:hover{background:none;}
   .ev-tb tr.cur td{font-weight:500;background:#FDF2F2;}
   .ev-tb .pc{color:var(--muted);font-size:11.5px;margin-left:3px;}
-  .ev-dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;vertical-align:1px;}
-  .ev-lg{display:flex;flex-wrap:wrap;gap:6px;margin:4px 0 6px;}
-  .ev-k{display:flex;align-items:center;gap:6px;border:1px solid var(--line);background:transparent;border-radius:7px;
-    padding:3px 9px;font-size:12px;cursor:pointer;font-family:inherit;color:inherit;}
-  .ev-k i{width:14px;height:3px;border-radius:2px;background:var(--c);}
-  .ev-k.cur{font-weight:600;} .ev-k.cur i{height:4px;}
-  .ev-k.off{color:#B8BCC1;} .ev-k.off i{background:#D8DADD;}
-  .ev-plot{position:relative;}
-  .ev-plot svg{display:block;}
-  .ev-tip{position:absolute;top:8px;display:none;pointer-events:none;background:rgba(34,38,43,.94);color:#F2F1EE;
-    border-radius:8px;padding:8px 11px;font-size:12px;line-height:1.55;min-width:200px;z-index:5;font-variant-numeric:tabular-nums;}
-  .ev-tip .t{color:#B9BEC4;margin-bottom:2px;}
-  .ev-tip .r{display:flex;justify-content:space-between;gap:12px;}
-  .ev-tip .r i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:6px;}
-  .ev-tip small{color:#B9BEC4;}
   .dt{display:grid;grid-template-columns:64px repeat(var(--n),minmax(0,1fr));font-size:12.5px;font-variant-numeric:tabular-nums;}
   .dt-plot{grid-column:2 / -1;min-width:0;}
   .dt>div{padding:3px 0;text-align:center;white-space:nowrap;}
@@ -283,62 +268,21 @@ function detailPlot(el, s, bars) {
   el.innerHTML = `<svg width="${W}" height="${H}" role="img">${g}</svg>`;
 }
 
-// Put/Call 展開列：各事件前後的原始值疊圖＋摘要表
-// 2026-11-19 使用者要求：所有事件用同一把尺比——百分位一律對同一段全期歷史（pool）算，不再各自比前 252 日
-const EV_COLORS = ["#2563EB", "#7C3AED", "#D97706", "#1D7A46"];   // 過去事件；本次固定紅色粗線
+// Put/Call 展開列：各事件前後的摘要表
+// 2026-11-19 使用者要求：所有事件用同一把尺比——百分位一律對同一段全期歷史（pool）算，不再各自比前 252 日；疊圖已依使用者要求刪除
 function drawEvents(td, r, pe) {
   const d = r.digits ?? 2, u = r.unit || "", P = pe.pool, evs = pe.events;
-  const col = (e, i) => e.current ? "#DC2626" : EV_COLORS[i % EV_COLORS.length];
   const ymd = s => s.replace(/-/g, "/");
-  td.innerHTML = `<div class="dt-t">事件對照：事件日前 5 至後 10 個交易日的原始數值；百分位全部事件用同一段歷史（${ymd(P.start)}–${ymd(P.end)}，${P.n} 個交易日）排名，100＝期間最高</div>
-    <div class="ev-lg">${evs.map((e, i) => `<button class="ev-k${e.current ? " cur" : ""}" data-i="${i}" style="--c:${col(e, i)}"><i></i>${esc(e.name)}</button>`).join("")}</div>
-    <div class="ev-plot"><div class="ev-tip"></div></div>
-    <table class="ev-tb"><thead><tr><th>事件</th><th>日期</th><th class="n">事件日</th><th class="n">期間最高</th><th class="n">最新／期末</th></tr></thead><tbody>${evs.map((e, i) => {
+  td.innerHTML = `<div class="dt-t">事件對照：事件日前 5 至後 10 個交易日；百分位全部事件用同一段歷史（${ymd(P.start)}–${ymd(P.end)}，${P.n} 個交易日）排名，100＝期間最高</div>
+    <table class="ev-tb"><thead><tr><th>事件</th><th>日期</th><th class="n">事件日</th><th class="n">期間最高</th><th class="n">最新／期末</th></tr></thead><tbody>${evs.map(e => {
       const z = e.pts.find(p => p[0] === 0), hi = e.pts.reduce((a, b) => b[2] > a[2] ? b : a), last = e.pts[e.pts.length - 1];
       const cell = p => `${fmt(p[2], d)}${u} <span class="pc">${p[1]}%</span>`;
-      return `<tr${e.current ? ' class="cur"' : ""}><td><i class="ev-dot" style="background:${col(e, i)}"></i>${esc(e.name)}</td><td class="mu">${ymd(e.date)}</td>
+      return `<tr${e.current ? ' class="cur"' : ""}><td>${esc(e.name)}</td><td class="mu">${ymd(e.date)}</td>
         <td class="n">${z ? cell(z) : "—"}</td>
         <td class="n">${cell(hi)} <small>${hi[0] >= 0 ? "+" : ""}${hi[0]} 日</small></td><td class="n">${cell(last)} <small>${last[0] >= 0 ? "+" : ""}${last[0]} 日</small></td></tr>`;
     }).join("")}</tbody></table>
     <div class="dt-t" style="margin-top:6px">[註1]：灰色百分比＝該數值在上述同一段歷史中的百分位，各事件可直接比較；舊事件的排名用到事件之後的資料，只適合事後對照，不是當時看得到的訊號。</div>
-    <div class="dt-t">[註2]：圖中灰色虛線＝同一段歷史的第 10／50／90 百分位（${fmt(P.p10, d)}／${fmt(P.p50, d)}／${fmt(P.p90, d)}）；點上方事件名稱可隱藏或顯示該線。</div>`;
-  const box = td.querySelector(".ev-plot"), tip = box.querySelector(".ev-tip"), on = evs.map(() => true);
-  const draw = () => {
-    const W = Math.max(280, box.clientWidth), H = innerWidth <= 640 ? 220 : 260, L = 42, R = 12, T = 12, B = 24;
-    const vis = evs.filter((_, i) => on[i]), all = vis.flatMap(e => e.pts.map(p => p[2])).concat([P.p10, P.p90]);
-    let lo = Math.min(...all), hi = Math.max(...all); const pad = (hi - lo) * .08 || .05; lo -= pad; hi += pad;
-    const X = o => L + (o + 5) / 15 * (W - L - R), Y = v => T + (hi - v) / (hi - lo) * (H - T - B);
-    const st = [.01, .02, .05, .1, .2, .25, .5, 1, 2, 5].find(s => (hi - lo) / s <= 6) || 10;
-    let g = "";
-    for (let v = Math.ceil(lo / st) * st; v <= hi; v += st) g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="rgba(0,0,0,.06)"/><text x="${L - 6}" y="${Y(v) + 4}" text-anchor="end">${fmt(v, d)}</text>`;
-    for (const [v, t] of [[P.p10, "P10"], [P.p50, "P50"], [P.p90, "P90"]]) g += `<line x1="${L}" x2="${W - R}" y1="${Y(v)}" y2="${Y(v)}" stroke="#9AA0A6" stroke-dasharray="4 3"/><text x="${W - R - 2}" y="${Y(v) - 4}" text-anchor="end" fill="#9AA0A6">${t}</text>`;
-    g += `<line x1="${X(0)}" x2="${X(0)}" y1="${T}" y2="${H - B}" stroke="#C9C6BF"/>`;
-    for (let o = -5; o <= 10; o += 5) g += `<text x="${X(o)}" y="${H - 6}" text-anchor="${o === -5 ? "start" : o === 10 ? "end" : "middle"}">${o === 0 ? "事件日" : (o > 0 ? "+" : "") + o + " 日"}</text>`;
-    evs.forEach((e, i) => { if (!on[i]) return;
-      const c = col(e, i), w = e.current ? 3 : 1.6;
-      g += `<path d="${e.pts.map((p, k) => (k ? "L" : "M") + X(p[0]).toFixed(1) + " " + Y(p[2]).toFixed(1)).join("")}" fill="none" stroke="${c}" stroke-width="${w}" stroke-linejoin="round"${e.current ? "" : ' opacity=".85"'}/>`;
-      const z = e.pts.find(p => p[0] === 0); if (z) g += `<circle cx="${X(0)}" cy="${Y(z[2])}" r="${e.current ? 4 : 3}" fill="${c}" stroke="#fff" stroke-width="1"/>`;
-    });
-    g += `<line class="xh" y1="${T}" y2="${H - B}" stroke="#8C9096" stroke-dasharray="3 3" style="display:none"/>`;
-    box.querySelector("svg")?.remove();
-    box.insertAdjacentHTML("afterbegin", `<svg width="${W}" height="${H}" font-size="11" fill="#8A9097">${g}</svg>`);
-    const sv = box.querySelector("svg"), xh = sv.querySelector(".xh");
-    sv.onpointermove = ev => {
-      const rc = sv.getBoundingClientRect(), o = Math.max(-5, Math.min(10, Math.round((ev.clientX - rc.left - L) / (W - L - R) * 15 - 5)));
-      xh.setAttribute("x1", X(o)); xh.setAttribute("x2", X(o)); xh.style.display = "";
-      const rows = evs.map((e, i) => [e, i, e.pts.find(p => p[0] === o)]).filter(x => on[x[1]] && x[2]).sort((a, b) => b[2][2] - a[2][2]);
-      tip.innerHTML = `<div class="t">${o === 0 ? "事件日" : (o > 0 ? "+" : "") + o + " 個交易日"}</div>` + rows.map(([e, i, p]) =>
-        `<div class="r"><span><i style="background:${col(e, i)}"></i>${esc(e.name)} <small>${short(p[3])}</small></span><b>${fmt(p[2], d)} <small>${p[1]}%</small></b></div>`).join("");
-      tip.style.display = rows.length ? "block" : "none";
-      const x = ev.clientX - rc.left, tw = tip.offsetWidth;
-      tip.style.left = (x + 14 + tw > W ? x - 14 - tw : x + 14) + "px";
-    };
-    sv.onpointerleave = () => { tip.style.display = "none"; xh.style.display = "none"; };
-  };
-  td.querySelectorAll(".ev-k").forEach(b => b.addEventListener("click", ev => {
-    ev.stopPropagation(); const i = +b.dataset.i; on[i] = !on[i]; b.classList.toggle("off", !on[i]); draw();
-  }));
-  requestAnimationFrame(draw);
+    <div class="dt-t">[註2]：同一段歷史的第 10／50／90 百分位為 ${fmt(P.p10, d)}／${fmt(P.p50, d)}／${fmt(P.p90, d)}。</div>`;
 }
 
 function drawDetail(tr) {
