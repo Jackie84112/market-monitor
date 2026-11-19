@@ -76,8 +76,9 @@
   .ev-tb td,.ev-tb th{padding:4px 8px;border-bottom:1px solid var(--line);}
   .ev-tb tr:last-child td{border-bottom:0;}
   .ev-tb tbody tr:hover{background:none;}
-  .lvl{display:block;font-size:11.5px;color:var(--muted);white-space:nowrap;margin-top:2px;font-weight:400;}
-  .lvl b{color:var(--ink);font-weight:500;}
+  .lvl{font-size:12.5px;font-weight:500;white-space:nowrap;margin-left:4px;}
+  td.name.has-rng{position:relative;padding-right:120px;}
+  .rng-n{position:absolute;right:10px;top:50%;transform:translateY(-50%);font-size:12.5px;color:var(--muted);white-space:nowrap;font-weight:400;}
   .ev-tb tr.cur td{font-weight:500;background:#FDF2F2;}
   .ev-tb .pc{color:var(--muted);font-size:11.5px;margin-left:3px;}
   .dt{display:grid;grid-template-columns:64px repeat(var(--n),minmax(0,1fr));font-size:12.5px;font-variant-numeric:tabular-nums;}
@@ -98,6 +99,8 @@
     table.cards td.name{display:block;text-align:left;font-weight:500;}
     table.cards td.name::before{content:none;}
     table.cards td.name small{font-weight:400;}
+    table.cards td.name.has-rng{padding-right:0;}
+    table.cards .rng-n{position:static;transform:none;display:block;margin-top:2px;padding-left:14px;font-size:12px;}
     table.cards tr.grp{padding:0;border:0;}
     table.cards tr.grp td{display:block;text-align:left;padding:8px 8px;font-size:18px;}
     table.cards tr.grp td::before{content:none;}
@@ -235,17 +238,19 @@ function rowsHTML(rows, expand) {
     const d = r.digits ?? 2, m = r.method;
     const lab = m === "sum5" ? "5 日累計" : m === "ma5" ? "5 日均變化" : "5 日變化";
     const chip = r.dir === "好轉" ? "g" : r.dir === "惡化" ? "r" : "";
-    // Put/Call：最新值下方加「平常 P25–P75＋高低判斷」（同一段歷史，見 build.py pc_events）
+    // Put/Call：標題旁加高低判斷（🟠／🔴），標題格右側列「平常 P25–P75」（同一段歷史，見 build.py pc_events）
+    // 2026-11-19 使用者要求：判斷放標題旁、範圍放在標題與最新之間
     const P = DATA.pcEvents && DATA.pcEvents[r.key] && DATA.pcEvents[r.key].pool;
-    let lvl = "";
+    let lvl = "", rng = "";
     if (P && P.p25 != null) {
       const v = r.last, low = r.key === "pc_tw_oi";   // 台指選未平倉反向：低＝支撐撤退
       const [t, e] = v > P.p95 ? ["過高", "🔴"] : v > P.p75 ? ["偏高", "🟠"] : v < P.p5 ? ["過低", "🔴"] : v < P.p25 ? ["偏低", "🟠"] : ["正常", ""];
       const rd = (r.unit || "").includes("%") ? 0 : d;   // 百分比範圍取整數，較好讀
-      lvl = `<span class="lvl">平常 ${fmt(P.p25, rd)}–${fmt(P.p75, rd)}${r.unit || ""}　<b>${e ? e + " " : ""}${t}${low && t.endsWith("低") ? "（要小心）" : ""}</b></span>`;
+      if (e) lvl = ` <span class="lvl">${e} ${t}${low && t.endsWith("低") ? "（要小心）" : ""}</span>`;
+      rng = `<span class="rng-n">平常 ${fmt(P.p25, rd)}–${fmt(P.p75, rd)}${r.unit || ""}</span>`;
     }
-    html += `<tr${expand ? ` class="tg" tabindex="0" aria-expanded="false" data-k="${r.key}"` : ""}><td class="name">${esc(r.label)}<small>${r.tip || ""}</small></td>
-      <td class="n" data-l="最新"><span>${fmt(r.last, d)}${r.unit || ""}${lvl}</span></td>
+    html += `<tr${expand ? ` class="tg" tabindex="0" aria-expanded="false" data-k="${r.key}"` : ""}><td class="name${rng ? " has-rng" : ""}">${esc(r.label)}${lvl}<small>${r.tip || ""}</small>${rng}</td>
+      <td class="n" data-l="最新">${fmt(r.last, d)}${r.unit || ""}</td>
       <td class="n mu" data-l="資料日">${short(r.date)}</td>
       <td class="n" data-l="變化"><small>${lab}</small> ${sign(r.measure, d === 0 ? 0 : m === "sum5" ? d : Math.min(d + 1, 3))}</td>
       <td data-l="方向"><span class="chip ${chip}">${r.dir}</span></td>
