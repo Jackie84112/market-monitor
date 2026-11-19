@@ -242,8 +242,9 @@ function rowsHTML(rows, expand) {
     // 2026-11-19 使用者要求：判斷放標題旁、範圍放在標題與最新之間
     const P = DATA.pcEvents && DATA.pcEvents[r.key] && DATA.pcEvents[r.key].pool;
     let lvl = "", rng = "";
-    if (P && P.p25 != null) {
-      const v = r.last, low = r.key === "pc_tw_oi";   // 台指選未平倉反向：低＝支撐撤退
+    // 2026-11-19 使用者：先不看台股 → 台指選兩列不顯示判斷與平常範圍（只做美股三列）
+    if (P && P.p25 != null && !r.key.startsWith("pc_tw")) {
+      const v = r.last, low = false;
       const [t, e] = v > P.p95 ? ["過高", "🔴"] : v > P.p75 ? ["偏高", "🟠"] : v < P.p5 ? ["過低", "🔴"] : v < P.p25 ? ["偏低", "🟠"] : ["正常", ""];
       const rd = (r.unit || "").includes("%") ? 0 : d;   // 百分比範圍取整數，較好讀
       if (e) lvl = ` <span class="lvl">${e} ${t}${low && t.endsWith("低") ? "（要小心）" : ""}</span>`;
