@@ -350,7 +350,14 @@ def pc_events(store):
             if pts:
                 ip = bisect.bisect_right(ds, pk) - 1   # 下跌前（SOX 高點）當天的 P/C
                 pre = [ds[ip], cpct(vs[ip]), vs[ip]] if ip >= 0 else None
-                evs.append({"name": name, "date": ds[e], "current": i_ev == len(PC_EVENTS) - 1, "pre": pre, "pts": pts})
+                # 恐慌退回：事件日後第一天回到平常上緣（P75）以下，相隔幾個交易日；之後到期末又超過 P75＝「又回升」
+                # 2026-11-19 使用者要求寫在「最新／期末」欄
+                p75 = q(.75)
+                back = None if vs[e] <= p75 else next((j - e for j in range(e + 1, len(ds)) if vs[j] <= p75), -1)
+                end = min(len(ds) - 1, e + PC_WIN[1])
+                again = back is not None and back > 0 and e + back < end and vs[end] > p75
+                evs.append({"name": name, "date": ds[e], "current": i_ev == len(PC_EVENTS) - 1, "pre": pre,
+                            "back": back, "again": again, "pts": pts})
         # p25–p75＝頁面「平常大約」；p5／p95 以外＝過高／過低（2026-11-19 使用者同意的高低判斷）
         out[key] = {"pool": {"start": ds[0], "end": ds[-1], "n": len(vs), "p5": q(.05), "p10": q(.1), "p25": q(.25),
                              "p50": q(.5), "p75": q(.75), "p90": q(.9), "p95": q(.95)},
