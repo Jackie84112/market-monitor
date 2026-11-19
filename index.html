@@ -296,7 +296,7 @@ function drawEvents(td, r, pe) {
       const cell = p => `${fmt(p[2], d)}${u} <span class="pc">${p[1]}%</span>`;
       return `<tr${e.current ? ' class="cur"' : ""}><td>${esc(e.name)}</td>
         <td class="n">${e.pre ? `${fmt(e.pre[2], d)}${u} <span class="pc">${e.pre[1]}%</span>` : "—"}</td>
-        <td class="n">${z ? cell(z) : "—"} <small>${ymd(e.date).slice(2)}</small></td><td class="n">${cell(last)} <small>${last[0] >= 0 ? "+" : ""}${last[0]} 日</small></td></tr>`;
+        <td class="n">${z ? cell(z) : "—"}</td><td class="n">${cell(last)}</td></tr>`;
     }).join("")}</tbody></table>
     <div class="dt-t" style="margin-top:6px">[註1]：灰色百分比＝該數值在上述同一段歷史中的百分位，各事件可直接比較；舊事件的排名用到事件之後的資料，只適合事後對照，不是當時看得到的訊號。</div>
     <div class="dt-t">[註2]：下跌前＝SOX 前高那天；事件日＝最恐慌那天；兩者只用來比較，不是買賣訊號。</div>
