@@ -33,8 +33,10 @@ ASIA_KEYS = {"t0050", "kospi"}
 CHART_START = "2026-06-01"  # 指數走勢圖起始日
 RETRACE = (0.382, 0.5, 0.618)
 # Put/Call 事件對照：最後一個是本次（頁面以強調色畫），新增事件往後加
-PC_EVENTS = [("川普關稅", "2025-04-08"), ("Burry 放空", "2025-11-20"), ("美伊戰爭", "2026-03-30"),
-             ("去槓桿", "2026-07-29"), ("CDS＋民主黨勝選", "2026-11-05")]
+# (名稱, 事件日＝最恐慌那天, 下跌前＝SOX 前高收盤日)；SOX 前高＝事件日前約 60 個交易日內最高收盤（2026-11-19 算定，使用者要求用 SOX）
+PC_EVENTS = [("川普關稅", "2025-04-08", "2025-01-22"), ("Burry 放空", "2025-11-20", "2025-10-29"),
+             ("美伊戰爭", "2026-03-30", "2026-02-25"), ("去槓桿", "2026-07-29", "2026-06-22"),
+             ("CDS＋民主黨勝選", "2026-11-05", "2026-10-06")]
 PC_WIN = (-5, 10)   # 事件日前 5、後 10 個交易日
 
 INDICES = [("spx", "S&P 500", "^GSPC"), ("ndx", "Nasdaq-100", "^NDX"), ("sox", "費城半導體 SOX", "^SOX"),
@@ -339,14 +341,16 @@ def pc_events(store):
         cpct = lambda x: round(100 * bisect.bisect_right(srt, x) / len(srt))
         q = lambda p: srt[min(len(srt) - 1, int(p * (len(srt) - 1) + 0.5))]
         evs = []
-        for i_ev, (name, date) in enumerate(PC_EVENTS):
+        for i_ev, (name, date, pk) in enumerate(PC_EVENTS):
             e = bisect.bisect_right(ds, date) - 1   # 事件日當天，休市則取前一個交易日
             if e < 0:
                 continue
             pts = [[off, cpct(vs[e + off]), vs[e + off], ds[e + off]]
                    for off in range(PC_WIN[0], PC_WIN[1] + 1) if 0 <= e + off < len(ds)]
             if pts:
-                evs.append({"name": name, "date": ds[e], "current": i_ev == len(PC_EVENTS) - 1, "pts": pts})
+                ip = bisect.bisect_right(ds, pk) - 1   # 下跌前（SOX 高點）當天的 P/C
+                pre = [ds[ip], cpct(vs[ip]), vs[ip]] if ip >= 0 else None
+                evs.append({"name": name, "date": ds[e], "current": i_ev == len(PC_EVENTS) - 1, "pre": pre, "pts": pts})
         # p25–p75＝頁面「平常大約」；p5／p95 以外＝過高／過低（2026-11-19 使用者同意的高低判斷）
         out[key] = {"pool": {"start": ds[0], "end": ds[-1], "n": len(vs), "p5": q(.05), "p10": q(.1), "p25": q(.25),
                              "p50": q(.5), "p75": q(.75), "p90": q(.9), "p95": q(.95)},
