@@ -610,6 +610,11 @@ def main():
         retrace.main()
     except Exception as e:
         print("ERR retrace", e)
+    try:   # Put/Call 2017 起長期走勢圖（首頁 Put/Call 下方）
+        import pc_long
+        pc_long.main()
+    except Exception as e:
+        print("ERR pc_long", e)
 
 
 if __name__ == "__main__":

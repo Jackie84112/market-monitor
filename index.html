@@ -90,6 +90,19 @@
   .dt>.h{text-align:left;color:var(--muted);font-size:12px;}
   .dt>.d{color:var(--muted);font-size:12px;border-top:1px solid var(--line);}
   .dt>.dt-gap{grid-column:1;padding:0;}
+  /* Put/Call 長期走勢（2017 起） */
+  tr.pcl>td{padding:12px 10px 14px;}
+  tbody tr.pcl:hover{background:transparent;}
+  .pcl-h{display:flex;flex-wrap:wrap;align-items:center;gap:6px 14px;margin-bottom:6px;}
+  .pcl-h b{font-size:15px;font-weight:700;color:var(--ink);}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:6px;overflow:hidden;}
+  .seg button{font:inherit;font-size:12.5px;border:0;background:#fff;color:var(--muted);padding:3px 10px;cursor:pointer;}
+  .seg button+button{border-left:1px solid var(--line);}
+  .seg button.on{background:var(--ink);color:#fff;}
+  .pcl-lg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--muted);}
+  .pcl-lg i{display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:5px;vertical-align:middle;}
+  .pcl-lg i.box{height:10px;width:12px;border-radius:2px;background:#F6DADA;}
+  .pcl-plot{position:relative;width:100%;}
   @media (max-width:900px){.multi{grid-template-columns:repeat(2,1fr);} .two{grid-template-columns:1fr;}}
   @media (max-width:640px){
     .multi{grid-template-columns:1fr;}
@@ -222,7 +235,15 @@ function line(el, s, o = {}) {
 const GROUP_NOTE = {"Put/Call": "[註]：Cboe 是芝加哥期權交易所（Chicago Board Options Exchange），美國最大的選擇權交易所，每天收盤後會公布旗下交易所的 Put/Call 比率，是市場最常引用的版本。"};
 function rowsHTML(rows, expand) {
   let html = "", grp = "";
-  const note = () => { if (GROUP_NOTE[grp]) html += `<tr class="gnote"><td colspan="6">${GROUP_NOTE[grp]}</td></tr>`; };
+  const note = () => {
+    if (GROUP_NOTE[grp]) html += `<tr class="gnote"><td colspan="6">${GROUP_NOTE[grp]}</td></tr>`;
+    // 2026-11-20 主管要求：Put/Call 下方加 2017 起長期走勢，對照歷次暴跌（data/pc_long.json，pipeline/pc_long.py）
+    if (grp === "Put/Call" && expand) html += `<tr class="gnote pcl"><td colspan="6">
+      <div class="pcl-h"><b>2017 年至今走勢</b><span class="seg" id="pclSeg"><button data-k="t" class="on">總</button><button data-k="e">個股</button><button data-k="i">指數</button></span>
+        <span class="pcl-lg"><span><i style="background:var(--chart)"></i>Put/Call（5 日均）</span><span><i style="background:#4B5158"></i>標普 500</span><span><i class="box"></i>標普暴跌期間（高點→低點）</span></span></div>
+      <div class="pcl-plot" id="pclPlot"></div>
+      <div class="notes" id="pclNote"></div></td></tr>`;
+  };
   for (const r of rows) {
     if (r.group !== grp) { note(); }
     if (r.group !== grp) { grp = r.group; html += `<tr class="grp"><td colspan="6">${grp}</td></tr>`; }
@@ -317,8 +338,66 @@ function drawDetail(tr) {
   detailPlot(td.querySelector(".dt-plot"), s, bars);
 }
 
+// Put/Call 長期走勢：上 P/C 5 日均、下標普 500，共用 X 軸；淡紅底＝標普 zigzag 跌 ≥7% 的高點→低點
+let PCL = null, pclKey = "t";
+const PCL_NAME = {t: "總", e: "個股", i: "指數"};
+function drawPcLong() {
+  const el = $("pclPlot");
+  if (!PCL || !el) return;
+  const all = PCL.d, raw = PCL[pclKey], i0 = all.findIndex(d => d >= PCL.start);
+  const ma = raw.map((_, i) => i < 4 ? null : raw.slice(i - 4, i + 1).reduce((a, b) => a + b, 0) / 5);
+  const D = all.slice(i0), M = ma.slice(i0), R = raw.slice(i0), S = PCL.s.slice(i0), n = D.length - 1;
+  const W = Math.max(el.clientWidth, 280), narrow = W < 560;
+  const L = 4, Rm = 46, H1 = narrow ? 170 : 220, gap = 14, H2 = narrow ? 90 : 110, B = 20, T = 6, H = T + H1 + gap + H2 + B;
+  const X = i => L + (W - L - Rm) * i / n;
+  const ext = a => { const v = a.filter(x => x != null); let lo = Math.min(...v), hi = Math.max(...v); const p = (hi - lo) * .06; return [lo - p, hi + p]; };
+  const [a1, b1] = ext(M), [a2, b2] = ext(S.map(v => v == null ? null : Math.log(v)));   // 標普用對數刻度，早年的跌幅才看得出來
+  const Y1 = v => T + H1 * (1 - (v - a1) / (b1 - a1)), Y2 = v => T + H1 + gap + H2 * (1 - (Math.log(v) - a2) / (b2 - a2));
+  const idx = {}; D.forEach((d, i) => idx[d] = i);
+  const at = d => idx[d] ?? D.findIndex(x => x >= d);
+  let g = "";
+  PCL.ev.forEach(e => {   // 暴跌區間
+    const x1 = X(Math.max(0, at(e[0]))), x2 = X(at(e[1]) < 0 ? n : at(e[1])), w = Math.max(x2 - x1, 2), c = e[3] ? "#F0BDBD" : "#F6DADA";
+    g += `<rect x="${x1.toFixed(1)}" y="${T}" width="${w.toFixed(1)}" height="${H1}" fill="${c}"/>`;
+    g += `<rect x="${x1.toFixed(1)}" y="${T + H1 + gap}" width="${w.toFixed(1)}" height="${H2}" fill="${c}"/>`;
+  });
+  const ticks = (a, b, k) => { const st = Math.pow(10, Math.floor(Math.log10((b - a) / k))), m = [1, 2, 2.5, 5, 10].find(x => (b - a) / (st * x) <= k) * st; const r = []; for (let v = Math.ceil(a / m) * m; v <= b; v += m) r.push(+v.toFixed(6)); return r; };
+  ticks(a1, b1, 4).forEach(v => { g += `<line x1="${L}" x2="${W - Rm}" y1="${Y1(v)}" y2="${Y1(v)}" stroke="#ECEAE5"/><text x="${W - Rm + 6}" y="${Y1(v) + 3.5}" font-size="10.5" fill="#6B7178">${v.toFixed(2)}</text>`; });
+  (narrow ? [2000, 4000, 8000] : [2000, 3000, 4000, 6000, 8000]).filter(v => Math.log(v) >= a2 && Math.log(v) <= b2).forEach(v => { g += `<line x1="${L}" x2="${W - Rm}" y1="${Y2(v)}" y2="${Y2(v)}" stroke="#ECEAE5"/><text x="${W - Rm + 6}" y="${Y2(v) + 3.5}" font-size="10.5" fill="#6B7178">${Math.round(v).toLocaleString("en-US")}</text>`; });
+  let yr = "";   // X 軸：每年第一個交易日（窄螢幕隔年標）
+  D.forEach((d, i) => { const y = d.slice(0, 4); if (y === yr) return; yr = y; if (narrow && +y % 2) return;
+    g += `<line x1="${X(i)}" x2="${X(i)}" y1="${H - B}" y2="${H - B + 4}" stroke="#B9BDC2"/><text x="${X(i) + 2}" y="${H - 5}" font-size="10.5" fill="#6B7178">${y}</text>`; });
+  g += `<line x1="${L}" x2="${W - Rm}" y1="${H - B}" y2="${H - B}" stroke="#B9BDC2"/>`;
+  const path = (arr, Y) => { let p = "", up = false; arr.forEach((v, i) => { if (v == null) { up = false; return; } p += (up ? "L" : "M") + X(i).toFixed(1) + " " + Y(v).toFixed(1); up = true; }); return p; };
+  g += `<path d="${path(M, Y1)}" fill="none" stroke="var(--chart)" stroke-width="1.3" stroke-linejoin="round"/>`;
+  g += `<path d="${path(S, Y2)}" fill="none" stroke="#4B5158" stroke-width="1.3" stroke-linejoin="round"/>`;
+  g += `<text x="${L + 4}" y="${T + 13}" font-size="11.5" fill="#6B7178">${PCL_NAME[pclKey]} Put/Call（5 日均）</text>`;
+  g += `<text x="${L + 4}" y="${T + H1 + gap + 13}" font-size="11.5" fill="#6B7178">標普 500（對數刻度）</text>`;
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="Put/Call 與標普 500 長期走勢">${g}
+    <line class="ch" y1="${T}" y2="${H - B}" stroke="#8C9096" stroke-width="1" style="display:none"/>
+    <circle class="d1" r="3" fill="var(--chart)" stroke="#fff" stroke-width="1.5" style="display:none"/>
+    <circle class="d2" r="3" fill="#4B5158" stroke="#fff" stroke-width="1.5" style="display:none"/>
+    <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
+  const svg = el.firstChild, ch = svg.querySelector(".ch"), d1 = svg.querySelector(".d1"), d2 = svg.querySelector(".d2");
+  svg.addEventListener("pointermove", e => {
+    const r = svg.getBoundingClientRect(), i = Math.max(0, Math.min(n, Math.round((e.clientX - r.left - L) / (W - L - Rm) * n)));
+    ch.setAttribute("x1", X(i)); ch.setAttribute("x2", X(i)); ch.style.display = "";
+    if (M[i] != null) { d1.setAttribute("cx", X(i)); d1.setAttribute("cy", Y1(M[i])); d1.style.display = ""; }
+    if (S[i] != null) { d2.setAttribute("cx", X(i)); d2.setAttribute("cy", Y2(S[i])); d2.style.display = ""; }
+    const ev = PCL.ev.find(x => D[i] >= x[0] && D[i] <= x[1]);
+    tip.innerHTML = `${D[i].replace(/-/g, "/")}<br>${PCL_NAME[pclKey]} P/C 5 日均 <b>${fmt(M[i])}</b>（當日 ${fmt(R[i])}）<br>標普 500 <b>${fmt(S[i], 0)}</b>`
+      + (ev ? `<br><span style="color:#F4B4B4">暴跌期間 ${ev[0].replace(/-/g, "/")}–${ev[1].replace(/-/g, "/")}${ev[3] ? "（進行中）" : ""}，${(ev[2] * 100).toFixed(1)}%</span>` : "");
+    tip.style.display = "block";
+    const tw = tip.offsetWidth;
+    tip.style.left = Math.max(6, Math.min(innerWidth - tw - 6, e.clientX + 12)) + "px";
+    tip.style.top = e.clientY - 80 + "px";
+  });
+  svg.addEventListener("pointerleave", () => { ch.style.display = d1.style.display = d2.style.display = "none"; tip.style.display = "none"; });
+}
+
 let DATA;
 function drawCharts() {
+  drawPcLong();
   if (!DATA) return;
   document.querySelectorAll(".spark:not(.onspark)").forEach(el => {
     const r = DATA.rows.find(y => y.key === el.dataset.k);
@@ -355,6 +434,15 @@ fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json()).then(j => {
   $("a").addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches("tr.tg")) { e.preventDefault(); toggle(e.target); } });
   $("b").innerHTML = rowsHTML(j.rows.filter(r => !A.includes(r.group)));
 
+  fetch("data/pc_long.json", {cache: "no-store"}).then(r => r.json()).then(p => {
+    PCL = p;
+    const cur = p.ev.find(e => e[3]);
+    $("pclNote").innerHTML = `<p>[註1]：淡紅底＝標普 500 從高點跌 7% 以上、到低點為止的期間（2017 年起共 ${p.ev.length} 次；跌與反彈都超過 7% 才算一段）${cur ? "；最右側較深色為目前這波，低點暫定為目前最低" : ""}。</p>
+      <p>[註2]：Put/Call 為 Cboe 每日數值的 5 日平均，滑鼠停在圖上可看當日數值；上方按鈕切換總／個股／指數。</p>`;
+    $("pclSeg").addEventListener("click", e => { const b = e.target.closest("button"); if (!b) return;
+      pclKey = b.dataset.k; $("pclSeg").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); drawPcLong(); });
+    drawPcLong();
+  }).catch(() => { const el = $("pclPlot"); if (el) el.innerHTML = '<small class="warn">長期走勢資料讀取失敗</small>'; });
   drawCharts();
   let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(drawCharts, 150); });
 }).catch(e => { $("sub").innerHTML = `<span class="warn">資料讀取失敗：${e}</span>`; });
