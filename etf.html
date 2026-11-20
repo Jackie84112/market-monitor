@@ -78,10 +78,8 @@
   /* 每檔 ETF 識別色（2026-11-20）：卡片頂端色帶＋標題色條，指數位置對應列加同色小點；避開紅綠（站內代表漲跌） */
   section.etf{border-top:4px solid var(--ec);}
   section.etf .head h2{border-left-color:var(--ec);}
-  /* 卡片間分隔（2026-11-20）：加大間距＋「— 2 / 4　SOXX —」，序號與代碼用該檔識別色 */
-  .esep{display:flex;align-items:center;gap:12px;margin:18px 0 0;color:var(--muted);font-size:13px;letter-spacing:1px;}
-  .esep::before,.esep::after{content:"";flex:1;height:1px;background:var(--line);}
-  .esep b{color:var(--ec);font-weight:700;font-size:14px;}
+  /* 卡片間分隔（2026-11-20）：加大間距＋一條灰色間隔線（使用者不要「2 / 4 代碼」文字） */
+  .esep{height:1px;background:#CFCCC4;margin:18px 0 4px;}
   .ed{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;position:relative;top:-1px;}
   #ipos .name small{display:block;line-height:1.35;margin-top:1px;}
   #ipos .rt{position:relative;width:130px;height:8px;background:#EFEEEA;border-radius:4px;display:inline-block;vertical-align:middle;}
@@ -176,7 +174,7 @@ Promise.all([...KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).
   DATA = arr;
   $("cards").innerHTML = arr.map((d, i) => {
     const sw = d.swing;
-    return `<div class="esep" style="--ec:${EC[i]}"><span>${i + 1} / ${arr.length}　<b>${esc(d.code)}</b></span></div><section class="card etf" style="--ec:${EC[i]}"><div class="head"><h2>${esc(d.name)}（${esc(d.code)}）</h2><span>${short(sw.high.date)} 收盤高點至 ${short(sw.low.date)} 收盤低點；以收盤低點為原點，之後每日收盤；資料日 ${d.asof.replace(/-/g, "/")}</span></div>
+    return `<div class="esep"></div><section class="card etf" style="--ec:${EC[i]}"><div class="head"><h2>${esc(d.name)}（${esc(d.code)}）</h2><span>${short(sw.high.date)} 收盤高點至 ${short(sw.low.date)} 收盤低點；以收盤低點為原點，之後每日收盤；資料日 ${d.asof.replace(/-/g, "/")}</span></div>
       ${VP_SEG("rc" + i).replace(/<\/div>$/, MA_SEG("rc" + i, d.code) + SC_SEG(i) + WIN_SEG("rc" + i) + "</div>")}
       <div id="rc${i}" style="width:100%"></div><div class="legend" id="rl${i}"></div></section>`;
   }).join("");
