@@ -74,6 +74,44 @@
   .seg{display:inline-flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:#fff;}
   .seg button{font:inherit;font-size:13.5px;border:0;background:transparent;color:var(--ink);padding:5px 16px;cursor:pointer;}
   .seg button.on{background:var(--ink);color:#fff;}
+  /* 指數位置（2026-11-20 自大盤監控首頁搬來）：樣式限定在 #ipos，避免與下方 ETF 卡片的 .rt 等衝突 */
+  #ipos .name small{display:block;line-height:1.35;margin-top:1px;}
+  #ipos .rt{position:relative;width:130px;height:8px;background:#EFEEEA;border-radius:4px;display:inline-block;vertical-align:middle;}
+  #ipos .rt i{position:absolute;left:0;top:0;bottom:0;background:var(--chart);border-radius:4px;}
+  #ipos .rt b{position:absolute;top:-2px;bottom:-2px;width:1px;background:#8C9096;}
+  #ipos .rtv{display:inline-block;width:46px;text-align:right;}
+  #ipos .multi{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;}
+  #ipos .mc{min-width:0;border-top:1px solid var(--line);padding-top:10px;}
+  #ipos .mc h3{font-size:13.5px;font-weight:500;margin:0 0 4px;display:flex;justify-content:space-between;gap:8px;}
+  #ipos .plot{position:relative;width:100%;}
+  #ipos tr.tg{cursor:pointer;}
+  #ipos tr.tg .name::before{content:"▸";display:inline-block;width:14px;color:var(--muted);font-size:11px;}
+  #ipos tr.tg.open .name::before{content:"▾";}
+  #ipos tr.tg .name small{padding-left:14px;}
+  #ipos tr.detail{display:none;}
+  #ipos tr.detail.open{display:table-row;}
+  #ipos tr.detail:hover{background:none;}
+  #ipos tr.detail>td{background:var(--soft);padding:10px 14px 12px;}
+  #ipos .dt-t{font-size:12px;color:var(--muted);margin-bottom:6px;}
+  @media (max-width:900px){#ipos .multi{grid-template-columns:repeat(2,1fr);}}
+  @media (max-width:640px){
+    #ipos .multi{grid-template-columns:1fr;}
+    #ipos table.cards thead{display:none;}
+    #ipos table.cards tr{display:block;padding:9px 0;border-bottom:1px solid var(--line);}
+    #ipos table.cards tbody tr:last-child{border-bottom:0;}
+    #ipos table.cards td{display:flex;justify-content:space-between;align-items:center;gap:12px;border:0;padding:2px 0;text-align:right;}
+    #ipos table.cards td::before{content:attr(data-l);color:var(--muted);font-size:12px;text-align:left;white-space:nowrap;}
+    #ipos table.cards td.name{display:block;text-align:left;font-weight:500;}
+    #ipos table.cards td.name::before{content:none;}
+    #ipos table.cards td.name small{font-weight:400;}
+    #ipos .rt{width:96px;}
+    #ipos table.cards tr.detail{display:none;padding:0;border:0;}
+    #ipos table.cards tr.detail.open{display:block;}
+    #ipos table.cards tr.detail>td{display:block;text-align:left;padding:8px 8px 10px;}
+    #ipos table.cards tr.detail>td::before{content:none;}
+    #ipos table.cards tr.tg td.name::before{content:"▸";}
+    #ipos table.cards tr.tg.open td.name::before{content:"▾";}
+  }
 </style>
 </head>
 <body>
@@ -84,6 +122,15 @@
     <p class="sub" id="sub">讀取中…</p>
     <div class="st" id="st"></div>
   </header>
+  <section class="card" id="ipos">
+    <div class="head"><h2>指數位置</h2><span>能反彈多少：高點、前低與回補關卡</span></div>
+    <div class="multi" id="multi" style="margin:0 0 18px"></div>
+    <table class="cards"><thead><tr><th>指數</th><th class="n">最新</th><th class="n">當日</th><th class="n">距高點</th><th class="n">距前低</th><th>回補進度</th><th class="n">下一關卡</th><th class="n">大跌前收盤</th></tr></thead><tbody id="idx"></tbody></table>
+    <div class="notes">
+      <p>[註1]：38.2% 回補位為反彈強度的參考門檻：低點守穩後 5～20 個交易日內仍未能收復，後續 60 個交易日收盤跌破前低的歷史機率約 61%～67%，已收復者則約 33%～39%，惟此為機率差異，並非有效的支撐壓力訊號。</p>
+      <p>[註2]：排序對應下方 ETF：0050 → SOX（SOXX）→ Nasdaq-100（QQQ）→ S&amp;P 500（SPY），KOSPI 沒有對應 ETF 放最後；資料更新：<span id="iupd">—</span>（台灣時間）。</p>
+    </div>
+  </section>
   <div id="cards" style="display:contents"></div>
   <div class="card"><div class="notes">
     <p>[註1]：下方量柱為當日成交量（百萬股），紅柱代表當日收盤高於前一日、綠柱代表低於前一日；最左邊是低點當天的全日成交量。</p>
@@ -94,6 +141,7 @@
     <p>[註6]：均線為收盤價簡單移動平均，台股與美股用各自慣用天數：0050 為月線20、季線60、半年線120、年線240；SOXX、QQQ、SPY 為月線20、季線50、半年線100、年線200（與 TradingView 預設一致）。顏色：月線橘、季線紫、半年線青綠、年線桃紅；用約兩年日線計算，回補段與各時間範圍都畫；四個按鈕可疊加，預設不畫，再點一次取消。均線只算到最新收盤日，不含盤中價。</p>
   </div></div>
 </div>
+<div id="tip"></div>
 <script src="retrace.js?v=20261117g"></script>
 <script>
 const $ = id => document.getElementById(id);
@@ -132,6 +180,98 @@ Promise.all([...KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).
   draw();
   let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(draw, 150); });
 }).catch(e => { $("sub").innerHTML = `<span style="color:#C02323">資料讀取失敗：${e}</span>`; console.error(e); });
+
+// ---------- 指數位置（2026-11-20 自 index.html 搬來；讀 data/monitor.json，排序跟下方 ETF 一致）----------
+(() => {
+  const ORDER = ["t0050", "sox", "ndx", "spx", "kospi"];   // 0050 → SOXX → QQQ → SPY；不在清單的放最後
+  const tip = $("tip");
+  const sign = (v, d = 2, u = "") => v == null ? "—" : (v > 0 ? "+" : "") + fmt(v, d) + u;
+  const cls = v => v > 0 ? "up" : v < 0 ? "dn" : "mu";
+  let IX = null;
+  // 單序列折線＋十字線提示（同 index.html 的 line）
+  function line(el, s, o = {}) {
+    const W = Math.max(el.clientWidth, 80), H = o.h || 170, L = 4, R = o.labels ? 58 : 4, T = 8, B = o.labels ? 20 : 4;
+    let vals = s.map(p => p[1]);
+    (o.levels || []).forEach(l => vals.push(l.v));
+    let lo = Math.min(...vals), hi = Math.max(...vals);
+    if (hi === lo) { hi += 1; lo -= 1; }
+    const pad = (hi - lo) * .05; lo -= pad; hi += pad;
+    const X = i => L + (W - L - R) * i / Math.max(1, s.length - 1), Y = v => T + (H - T - B) * (1 - (v - lo) / (hi - lo));
+    let g = "", lastY = Infinity;
+    (o.levels || []).forEach(l => {
+      g += `<line x1="${L}" x2="${W - R}" y1="${Y(l.v)}" y2="${Y(l.v)}" stroke="#B9BDC2" stroke-width="1" stroke-dasharray="3 3"/>`;
+      if (lastY - Y(l.v) >= 12) { g += `<text x="${W - R + 4}" y="${Y(l.v) + 3.5}" font-size="10.5" fill="#6B7178">${l.name}</text>`; lastY = Y(l.v); }
+    });
+    if (o.labels) [0, Math.floor((s.length - 1) / 2), s.length - 1].forEach((i, k) => {
+      g += `<text x="${X(i)}" y="${H - 5}" font-size="10.5" fill="#6B7178" text-anchor="${["start", "middle", "end"][k]}">${short(s[i][0])}</text>`;
+    });
+    const path = s.map((p, i) => (i ? "L" : "M") + X(i).toFixed(1) + " " + Y(p[1]).toFixed(1)).join(""), n = s.length - 1;
+    el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="${esc(o.name || "走勢")}">${g}
+      <path d="${path}" fill="none" stroke="var(--chart)" stroke-width="${o.labels ? 2 : 1.5}" stroke-linejoin="round"/>
+      <circle cx="${X(n)}" cy="${Y(s[n][1])}" r="${o.labels ? 3.5 : 2.5}" fill="var(--chart)" stroke="#fff" stroke-width="1.5"/>
+      <line class="ch" y1="${T}" y2="${H - B}" stroke="#8C9096" stroke-width="1" style="display:none"/>
+      <rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
+    const svg = el.firstChild, ch = svg.querySelector(".ch");
+    svg.addEventListener("pointermove", e => {
+      const r = svg.getBoundingClientRect(), i = Math.max(0, Math.min(n, Math.round((e.clientX - r.left - L) / (W - L - R) * n)));
+      ch.setAttribute("x1", X(i)); ch.setAttribute("x2", X(i)); ch.style.display = "";
+      tip.innerHTML = `${s[i][0].replace(/-/g, "/")}　<b>${fmt(s[i][1], o.d ?? 2)}${o.u || ""}</b>`;
+      tip.style.display = "block";
+      tip.style.left = Math.max(6, Math.min(innerWidth - tip.offsetWidth - 6, e.clientX + 12)) + "px";
+      tip.style.top = e.clientY - 36 + "px";
+    });
+    svg.addEventListener("pointerleave", () => { ch.style.display = "none"; tip.style.display = "none"; });
+  }
+  // 指數列展開：共用回補走勢圖；剛創新低（低點後不到 5 個交易日）時原點前補跌下來的走勢
+  function idxPre(x) {
+    const after = x.series.filter(p => p[0] > x.low[0]).length;
+    if (after >= 5) return [];
+    const before = x.series.filter(p => p[0] < x.low[0] && p[0] >= x.peak[0]);
+    return before.slice(Math.max(0, before.length - (10 - after - 1))).map(p => [p[0], p[1]]);
+  }
+  const idxRetrace = x => ({en: x.name, dec: x.last < 1000 ? 2 : 0, lowWord: "收盤低", swing: {high: {date: x.peak[0], v: x.peak[1]}, low: {date: x.low[0], v: x.low[1]},
+    pre: idxPre(x), path: x.series.filter(p => p[0] > x.low[0]).map(p => [p[0], p[1]]),
+    levels: x.levels.slice(0, 3).map(l => ({name: l.name, v: l.v}))}});
+  function drawIdxDetail(tr) {
+    const x = IX.find(y => y.key === tr.dataset.i), td = tr.firstChild;
+    if (!td.firstChild) td.innerHTML = `<div class="dt-t">${esc(x.name)} 回補走勢：以 ${short(x.low[0])} 收盤為原點（0%），之後每日收盤，跌破原點為負；滑鼠移到點上顯示該日回補水位</div><div id="ir_${x.key}" style="width:100%"></div><div class="legend" id="il_${x.key}"></div>
+      <div class="notes"><p>[註1]：高點＝${short(x.peak[0])} 收盤、原點＝${short(x.low[0])} 收盤，兩者固定不隨之後的新低移動（亞股以美股大跌隔天為原點）；回補位 = 低點 + 比例 ×（高點 − 低點），38.2%、50%、61.8% 為常用比例，不具預測力。</p></div>`;
+    drawRetrace($("ir_" + x.key), idxRetrace(x), $("il_" + x.key));
+  }
+  function drawIdx() {
+    if (!IX) return;
+    IX.forEach(x => line($("m_" + x.key), x.series, {h: 180, labels: true, levels: x.levels.map(l => ({name: l.name, v: l.v})), d: 2, name: x.name}));
+    document.querySelectorAll("#idx tr.detail.open").forEach(drawIdxDetail);
+  }
+  fetch("data/monitor.json", {cache: "no-store"}).then(r => r.json()).then(j => {
+    const rank = k => { const i = ORDER.indexOf(k); return i < 0 ? 99 : i; };
+    IX = [...j.indices].sort((a, b) => rank(a.key) - rank(b.key));
+    $("iupd").textContent = j.updated;
+    $("idx").innerHTML = IX.map(x => {
+      const d = x.last < 1000 ? 2 : 0, ticks = x.levels.map(l => `<b style="left:${parseFloat(l.name)}%"></b>`).join("");
+      return `<tr class="tg" tabindex="0" aria-expanded="false" data-k="${x.key}"><td class="name">${esc(x.name)}${x.live ? '<span class="tag">盤中</span>' : ""}<small>高 ${fmt(x.peak[1], d)}（${short(x.peak[0])}）／低 ${fmt(x.low[1], d)}（${short(x.low[0])}）</small></td>
+        <td class="n" data-l="最新">${fmt(x.last, d)} <small>${short(x.date)}</small></td>
+        <td class="n ${cls(x.chg)}" data-l="當日">${sign(x.chg, 2, "%")}</td>
+        <td class="n ${cls(x.fromPeak)}" data-l="距高點">${sign(x.fromPeak, 1, "%")}</td>
+        <td class="n ${cls(x.fromLow)}" data-l="距前低">${sign(x.fromLow, 1, "%")}</td>
+        <td data-l="回補進度"><span><span class="rt"><i style="width:${Math.max(0, Math.min(100, x.retrace ?? 0))}%"></i>${ticks}</span><span class="rtv">${x.retrace == null ? "—" : fmt(x.retrace, Math.abs(x.retrace) < 1 && x.retrace !== 0 ? 1 : 0) + "%"}</span></span></td>
+        <td class="n" data-l="下一關卡">${x.next ? `${x.next.name} ${fmt(x.next.v, d)} <small>${sign(x.next.dist, 1, "%")}</small>` : "—"}</td>
+        <td class="n" data-l="大跌前收盤">${x.gap ? `${fmt(x.gap.v, d)} <small>${short(x.gap.date)} ${sign(x.gap.drop, 1, "%")}</small>` : "—"}</td></tr>
+        <tr class="detail" data-i="${x.key}"><td colspan="8"></td></tr>`;
+    }).join("");
+    $("multi").innerHTML = IX.map(x =>
+      `<div class="mc"><h3><span>${esc(x.name)}</span><small>${fmt(x.last, x.last < 1000 ? 2 : 0)}</small></h3><div class="plot" id="m_${x.key}"></div></div>`).join("");
+    const toggleIdx = tr => {
+      const dt = tr.nextElementSibling, open = tr.classList.toggle("open");
+      dt.classList.toggle("open", open); tr.setAttribute("aria-expanded", open);
+      if (open) drawIdxDetail(dt);
+    };
+    $("idx").addEventListener("click", e => { const tr = e.target.closest("tr.tg"); if (tr) toggleIdx(tr); });
+    $("idx").addEventListener("keydown", e => { if ((e.key === "Enter" || e.key === " ") && e.target.matches("tr.tg")) { e.preventDefault(); toggleIdx(e.target); } });
+    drawIdx();
+    let t; addEventListener("resize", () => { clearTimeout(t); t = setTimeout(drawIdx, 150); });
+  }).catch(e => { $("idx").innerHTML = `<tr><td colspan="8" class="warn">指數資料讀取失敗：${e}</td></tr>`; console.error(e); });
+})();
 </script>
 </body>
 </html>
