@@ -78,6 +78,17 @@
   /* 每檔 ETF 識別色（2026-11-20）：卡片頂端色帶＋標題色條，指數位置對應列加同色小點；避開紅綠（站內代表漲跌） */
   section.etf{border-top:4px solid var(--ec);}
   section.etf .head h2{border-left-color:var(--ec);}
+  /* 標題列色塊（2026-11-20）：淡識別色底、左大代碼、右最新價＋當日漲跌（紅漲綠跌） */
+  section.etf .ehead{margin:-14px -16px 14px;padding:12px 16px;border-bottom:1px solid var(--line);border-radius:6px 6px 0 0;
+    background:color-mix(in srgb,var(--ec) 9%,#fff);align-items:center;flex-wrap:nowrap;gap:16px;}
+  .ehead .ecode{font-size:30px;font-weight:700;color:var(--ec);letter-spacing:.5px;line-height:1;white-space:nowrap;}
+  .ehead .etit{min-width:0;flex:1;}
+  .ehead .etit h2{border-left:0;padding-left:0;font-size:18px;}
+  .ehead .etit span{display:block;margin-top:2px;font-size:12.5px;}
+  .ehead .epx{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums;}
+  .ehead .epx b{display:block;font-size:26px;line-height:1.1;}
+  .ehead .epx em{font-style:normal;font-size:15px;font-weight:700;margin-right:6px;}
+  @media (max-width:640px){section.etf .ehead{flex-wrap:wrap;gap:6px 12px;} .ehead .ecode{font-size:24px;} .ehead .etit{order:3;flex-basis:100%;} .ehead .epx{margin-left:auto;} .ehead .epx b{font-size:22px;}}
   /* 卡片間分隔（2026-11-20）：加大間距＋一條灰色間隔線（使用者不要「2 / 4 代碼」文字） */
   .esep{height:1px;background:#CFCCC4;margin:18px 0 4px;}
   .ed{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;position:relative;top:-1px;}
@@ -174,7 +185,11 @@ Promise.all([...KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).
   DATA = arr;
   $("cards").innerHTML = arr.map((d, i) => {
     const sw = d.swing;
-    return `<div class="esep"></div><section class="card etf" style="--ec:${EC[i]}"><div class="head"><h2>${esc(d.name)}（${esc(d.code)}）</h2><span>${short(sw.high.date)} 收盤高點至 ${short(sw.low.date)} 收盤低點；以收盤低點為原點，之後每日收盤；資料日 ${d.asof.replace(/-/g, "/")}</span></div>
+    const lp = (sw.path && sw.path.length) ? sw.path[sw.path.length - 1] : [sw.low.date, sw.low.v, null, sw.lowChg];   // [日期, 收盤, 量, 當日%]
+    const ch = lp[3], cc = ch > 0 ? "up" : ch < 0 ? "dn" : "mu";
+    return `<div class="esep"></div><section class="card etf" style="--ec:${EC[i]}"><div class="head ehead"><div class="ecode">${esc(d.code)}</div>
+      <div class="etit"><h2>${esc(d.name)}</h2><span>${short(sw.high.date)} 收盤高點至 ${short(sw.low.date)} 收盤低點；以收盤低點為原點，之後每日收盤</span></div>
+      <div class="epx"><b>${fmt(lp[1], d.dec ?? 2)}</b><em class="${cc}">${ch == null ? "—" : (ch > 0 ? "+" : "") + fmt(ch, 2) + "%"}</em><small>${short(lp[0])}${d.live ? " 盤中" : " 收盤"}</small></div></div>
       ${VP_SEG("rc" + i).replace(/<\/div>$/, MA_SEG("rc" + i, d.code) + SC_SEG(i) + WIN_SEG("rc" + i) + "</div>")}
       <div id="rc${i}" style="width:100%"></div><div class="legend" id="rl${i}"></div></section>`;
   }).join("");
