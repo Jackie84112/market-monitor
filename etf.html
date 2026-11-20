@@ -75,6 +75,10 @@
   .seg button{font:inherit;font-size:13.5px;border:0;background:transparent;color:var(--ink);padding:5px 16px;cursor:pointer;}
   .seg button.on{background:var(--ink);color:#fff;}
   /* 指數位置（2026-11-20 自大盤監控首頁搬來）：樣式限定在 #ipos，避免與下方 ETF 卡片的 .rt 等衝突 */
+  /* 每檔 ETF 識別色（2026-11-20）：卡片頂端色帶＋標題色條，指數位置對應列加同色小點；避開紅綠（站內代表漲跌） */
+  section.etf{border-top:4px solid var(--ec);}
+  section.etf .head h2{border-left-color:var(--ec);}
+  .ed{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px;vertical-align:middle;position:relative;top:-1px;}
   #ipos .name small{display:block;line-height:1.35;margin-top:1px;}
   #ipos .rt{position:relative;width:130px;height:8px;background:#EFEEEA;border-radius:4px;display:inline-block;vertical-align:middle;}
   #ipos .rt i{position:absolute;left:0;top:0;bottom:0;background:var(--chart);border-radius:4px;}
@@ -149,6 +153,10 @@ const fmt = (v, d = 2) => v == null ? "—" : Number(v).toLocaleString("en-US", 
 const short = d => d ? d.slice(5).replace("-", "/") : "—";
 const esc = s => String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;");
 const KEYS = ["etf_0050", "etf_soxx", "etf_qqq", "etf_spy"];
+// 識別色：0050 橘、SOXX 紫、QQQ 藍、SPY 青；指數位置用 IDX_EC 對應同色
+const EC = ["#C2410C", "#7C3AED", "#2563EB", "#0891B2"];
+const IDX_EC = {t0050: EC[0], sox: EC[1], ndx: EC[2], spx: EC[3]};
+const dot = c => c ? `<i class="ed" style="background:${c}"></i>` : "";
 let DATA = [], SCN = {};
 // 情境模擬（同 AMD 頁）：data/etf_scenario.json 依資料檔名放各 ETF 的三條示意路徑；有設定的 ETF 才出現開關，預設關
 const SON = {};
@@ -164,7 +172,7 @@ Promise.all([...KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).
   DATA = arr;
   $("cards").innerHTML = arr.map((d, i) => {
     const sw = d.swing;
-    return `<section class="card"><div class="head"><h2>${esc(d.name)}（${esc(d.code)}）</h2><span>${short(sw.high.date)} 收盤高點至 ${short(sw.low.date)} 收盤低點；以收盤低點為原點，之後每日收盤；資料日 ${d.asof.replace(/-/g, "/")}</span></div>
+    return `<section class="card etf" style="--ec:${EC[i]}"><div class="head"><h2>${esc(d.name)}（${esc(d.code)}）</h2><span>${short(sw.high.date)} 收盤高點至 ${short(sw.low.date)} 收盤低點；以收盤低點為原點，之後每日收盤；資料日 ${d.asof.replace(/-/g, "/")}</span></div>
       ${VP_SEG("rc" + i).replace(/<\/div>$/, MA_SEG("rc" + i, d.code) + SC_SEG(i) + WIN_SEG("rc" + i) + "</div>")}
       <div id="rc${i}" style="width:100%"></div><div class="legend" id="rl${i}"></div></section>`;
   }).join("");
@@ -249,7 +257,7 @@ Promise.all([...KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).
     $("iupd").textContent = j.updated;
     $("idx").innerHTML = IX.map(x => {
       const d = x.last < 1000 ? 2 : 0, ticks = x.levels.map(l => `<b style="left:${parseFloat(l.name)}%"></b>`).join("");
-      return `<tr class="tg" tabindex="0" aria-expanded="false" data-k="${x.key}"><td class="name">${esc(x.name)}${x.live ? '<span class="tag">盤中</span>' : ""}<small>高 ${fmt(x.peak[1], d)}（${short(x.peak[0])}）／低 ${fmt(x.low[1], d)}（${short(x.low[0])}）</small></td>
+      return `<tr class="tg" tabindex="0" aria-expanded="false" data-k="${x.key}"><td class="name">${dot(IDX_EC[x.key])}${esc(x.name)}${x.live ? '<span class="tag">盤中</span>' : ""}<small>高 ${fmt(x.peak[1], d)}（${short(x.peak[0])}）／低 ${fmt(x.low[1], d)}（${short(x.low[0])}）</small></td>
         <td class="n" data-l="最新">${fmt(x.last, d)} <small>${short(x.date)}</small></td>
         <td class="n ${cls(x.chg)}" data-l="當日">${sign(x.chg, 2, "%")}</td>
         <td class="n ${cls(x.fromPeak)}" data-l="距高點">${sign(x.fromPeak, 1, "%")}</td>
@@ -260,7 +268,7 @@ Promise.all([...KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).
         <tr class="detail" data-i="${x.key}"><td colspan="8"></td></tr>`;
     }).join("");
     $("multi").innerHTML = IX.map(x =>
-      `<div class="mc"><h3><span>${esc(x.name)}</span><small>${fmt(x.last, x.last < 1000 ? 2 : 0)}</small></h3><div class="plot" id="m_${x.key}"></div></div>`).join("");
+      `<div class="mc"><h3><span>${dot(IDX_EC[x.key])}${esc(x.name)}</span><small>${fmt(x.last, x.last < 1000 ? 2 : 0)}</small></h3><div class="plot" id="m_${x.key}"></div></div>`).join("");
     const toggleIdx = tr => {
       const dt = tr.nextElementSibling, open = tr.classList.toggle("open");
       dt.classList.toggle("open", open); tr.setAttribute("aria-expanded", open);
