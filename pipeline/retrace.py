@@ -21,7 +21,7 @@ STOCKS = [
     {"key": "avgo", "sym": "AVGO", "name": "博通", "en": "Broadcom", "code": "AVGO", "high": "2026-10-06", "low": "2026-11-20", "dec": 2, "ccy": "USD", "close": True, "vpvr": 1, "hist": True},
     {"key": "nvda", "sym": "NVDA", "name": "英偉達", "en": "NVIDIA", "code": "NVDA", "high": "2026-10-06", "low": "2026-11-20", "dec": 2, "ccy": "USD", "close": True, "vpvr": 2, "hist": True},
     {"key": "guc", "sym": "3443.TW", "name": "創意", "en": "Global Unichip", "code": "3443", "high": "2026-10-06", "low": "2026-11-20", "dec": 0, "ccy": "TWD", "close": True, "vpvr": 50, "hist": True},
-    {"key": "alchip", "sym": "3661.TW", "name": "世芯-KY", "en": "Alchip", "code": "3661", "high": "2026-10-06", "low": "2026-11-20", "dec": 0, "ccy": "TWD", "close": True, "vpvr": 50, "hist": True},
+    {"key": "alchip", "sym": "3661.TW", "name": "世芯-KY", "en": "Alchip", "code": "3661", "high": "2026-10-12", "low": "2026-11-20", "dec": 0, "ccy": "TWD", "close": True, "vpvr": 50, "hist": True},   # 世芯高點 2026-11-23 使用者改 10/12（實際波段高點 4,395；10/6 為 4,180）
     # ETF 監控子頁（etf.html）四檔；低點日期手動設定（高點之後最低收盤價所在日）
     {"key": "etf_0050", "sym": "0050.TW", "name": "元大台灣50", "en": "Yuanta Taiwan 50 ETF", "code": "0050", "high": "2026-10-06", "low": "2026-11-20", "dec": 2, "ccy": "TWD", "close": True, "vpvr": 0.5, "hist": True},
     {"key": "etf_soxx", "sym": "SOXX", "name": "iShares 半導體 ETF", "en": "iShares Semiconductor ETF", "code": "SOXX", "high": "2026-10-06", "low": "2026-11-20", "dec": 2, "ccy": "USD", "close": True, "vpvr": 1, "hist": True},
@@ -62,7 +62,7 @@ def build(s):
     try:
         from build import index_position, CHART_START
         cl = [[x["d"], x["c"]] for x in rows]
-        pos = {"series": [[d, r2(v)] for d, v in cl if d >= CHART_START], **index_position(cl, live, s["low"])}
+        pos = {"series": [[d, r2(v)] for d, v in cl if d >= CHART_START], **index_position(cl, live, s["low"], s["high"])}
     except Exception as e:
         print("ERR pos", s["key"], e)
     return {"lowWord": "收盤低" if s.get("close") else "最低", "updated": dt.datetime.now(TW).strftime("%Y/%m/%d %H:%M"), "name": s["name"], "en": s["en"], "code": s["code"],

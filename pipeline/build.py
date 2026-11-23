@@ -423,10 +423,10 @@ def update_store(backfill):
 
 
 # ---------------------------------------------------------------- 計算
-def index_position(rows, live, low_date):
-    """高點＝PEAK_DATE 收盤；原點（前低）＝low_date 收盤（休市皆取前一交易日），固定不動，之後跌破則回補為負。盤中那筆只顯示，不進高低點計算。"""
+def index_position(rows, live, low_date, peak_date=None):
+    """高點＝peak_date（預設 PEAK_DATE）收盤；原點（前低）＝low_date 收盤（休市皆取前一交易日），固定不動，之後跌破則回補為負。盤中那筆只顯示，不進高低點計算。"""
     done = rows[:-1] if live else rows
-    peak = [r for r in done if r[0] <= PEAK_DATE][-1]
+    peak = [r for r in done if r[0] <= (peak_date or PEAK_DATE)][-1]
     low = [r for r in done if r[0] <= low_date][-1]
     last = rows[-1]
     prev = done[-1][1] if live else done[-2][1]

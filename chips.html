@@ -144,13 +144,13 @@
     <div class="multi" id="multi" style="margin:0 0 18px"></div>
     <table class="cards"><thead><tr><th>公司</th><th class="n">最新</th><th class="n">當日</th><th class="n">距高點</th><th class="n">距前低</th><th>回補進度</th><th class="n">下一關卡</th><th class="n">大跌前收盤</th></tr></thead><tbody id="idx"></tbody></table>
     <div class="notes">
-      <p>[註1]：高點＝10/6 收盤、原點＝11/20 收盤（固定不動，跌破原點回補為負）；回補位 = 低點 + 比例 ×（高點 − 低點），38.2%、50%、61.8% 為常用比例，不具預測力。排序同下方個股卡；資料更新：<span id="iupd">—</span>（台灣時間）。</p>
+      <p>[註1]：高點＝10/6 收盤（世芯為 10/12）、原點＝11/20 收盤（固定不動，跌破原點回補為負）；回補位 = 低點 + 比例 ×（高點 − 低點），38.2%、50%、61.8% 為常用比例，不具預測力。排序同下方個股卡；資料更新：<span id="iupd">—</span>（台灣時間）。</p>
     </div>
   </section>
   <div id="cards" style="display:contents"></div>
 </div>
 <div id="tip"></div>
-<script src="retrace.js?v=20261123p"></script>
+<script src="retrace.js?v=20261123q"></script>
 <script>
 const $ = id => document.getElementById(id);
 const fmt = (v, d = 2) => v == null ? "—" : Number(v).toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
@@ -181,7 +181,7 @@ Promise.all([...KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).
     return `<div class="esep"></div><section class="card etf" style="--ec:${EC[i]}"><div class="head ehead"><div class="ecode">${esc(d.code)}</div>
       <div class="etit"><h2>${esc(d.name)}</h2><span>${short(sw.high.date)} 收盤高點至 ${short(sw.low.date)} 收盤低點；以收盤低點為原點，之後每日收盤</span></div>
       <div class="epx"><b>${fmt(lp[1], d.dec ?? 2)}</b><em class="${cc}">${ch == null ? "—" : (ch > 0 ? "+" : "") + fmt(ch, 2) + "%"}</em><small>${short(lp[0])}${d.live ? " 盤中" : " 收盤"}</small></div></div>
-      ${VP_SEG("rc" + i).replace(/<\/div>$/, MA_SEG("rc" + i, d.code) + SC_SEG(i) + MEAS_SEG("rc" + i) + WIN_SEG("rc" + i) + "</div>")}
+      ${VP_SEG("rc" + i, `${+sw.high.date.slice(5, 7)}/${+sw.high.date.slice(8)}`).replace(/<\/div>$/, MA_SEG("rc" + i, d.code) + SC_SEG(i) + MEAS_SEG("rc" + i) + WIN_SEG("rc" + i) + "</div>")}
       <div id="rc${i}" style="width:100%"></div><div class="legend" id="rl${i}"></div></section>`;
   }).join("");
   const asof = arr.map(d => d.asof).sort().pop();
