@@ -180,7 +180,7 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
     g += `<text x="${W - R + 6}" y="${yl + (Math.abs(yl - ys) < 13 ? (last[1] > last[2] ? -4 : 12) : 3.5)}" font-size="10.5" fill="var(--chart)">MACD　${fmt(last[1], dec)}</text><text x="${W - R + 6}" y="${ys + (Math.abs(yl - ys) < 13 ? (last[1] > last[2] ? 12 : -4) : 3.5)}" font-size="10.5" fill="#D97706">信號　${fmt(last[2], dec)}</text>`;
   }
   // 📏 測量（仿 TradingView 價格區間；只在有滑鼠的電腦版出現）：按鈕→點起點→點終點，吸附每日收盤；可畫多段，點選後按 Delete 刪除；重新整理即清空
-  const MEAS_ON = typeof matchMedia === "function" && matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const MEAS_ON = MEAS_OK && !!document.querySelector(`.seg[data-meas="${el.id}"]`);   // 只有頁面放了 MEAS_SEG 的圖才開放
   const ms = ((drawRetrace.meas = drawRetrace.meas || {})[el.id] = (drawRetrace.meas || {})[el.id] || {list: [], mode: false, pick: null, sel: -1});
   (drawRetrace.redraw = drawRetrace.redraw || {})[el.id] = () => drawRetrace(el, data, leg);
   const dI = Object.fromEntries(pts.map((p, i) => [p[0], i]));
@@ -202,14 +202,15 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   };
   const mShown = ms.list.map((m, k) => (m.a in dI && m.b in dI) ? {k, ...measBox(dI[m.a], dI[m.b], k === ms.sel)} : null).filter(Boolean);
   const mg = mShown.map(m => m.svg).join("");
-  const mBtn = MEAS_ON ? `<button type="button" class="meas-btn" style="position:absolute;top:${T + 4}px;right:${R + 8}px;font:inherit;font-size:12.5px;padding:3px 10px;border-radius:999px;cursor:pointer;border:1px solid ${ms.mode ? "#22262B" : "#CFCDC6"};background:${ms.mode ? "#22262B" : "#fff"};color:${ms.mode ? "#fff" : "#22262B"}">📏 ${ms.mode ? (ms.pick ? "點終點（Esc 取消）" : "點起點（Esc 取消）") : "測量"}</button>` : "";
   el.style.position = "relative";
-  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="${DD.en} 回補走勢圖與每日成交量">${g}<g id="rmeas">${mg}</g><g id="rhov"></g><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>${mBtn}`;
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="${DD.en} 回補走勢圖與每日成交量">${g}<g id="rmeas">${mg}</g><g id="rhov"></g><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
   const svg = el.firstChild, hov = svg.querySelector("#rhov");
   const snapI = e => { const x = e.clientX - svg.getBoundingClientRect().left; return Math.max(0, Math.min(n - 1, Math.round((x - L) / pw))); };
   const inPlot = e => { const y = e.clientY - svg.getBoundingClientRect().top; return y >= T - 6 && y <= T + PH + 6; };
   if (MEAS_ON) {
-    el.querySelector(".meas-btn").onclick = ev => { ev.stopPropagation(); ms.mode = !ms.mode; ms.pick = null; ms.sel = -1; drawRetrace.redraw[el.id](); };
+    const mb = document.querySelector(`.seg[data-meas="${el.id}"] button`);   // 控制列上的按鈕：跟著狀態換字與底色
+    mb.classList.toggle("on", ms.mode); mb.setAttribute("aria-pressed", ms.mode);
+    mb.textContent = ms.mode ? (ms.pick ? "📏 點終點" : "📏 點起點") : "📏 測量";
     if (!drawRetrace.keyBound) {   // 全頁只綁一次：Delete／Backspace 刪除選取的測量，Esc 取消畫到一半
       drawRetrace.keyBound = true;
       document.addEventListener("keydown", e => {
@@ -278,7 +279,7 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
   });
   svg.addEventListener("pointerdown", e => { const i = near(e), b_ = i < 0 ? vpHit(e) : null; if (i >= 0) show(i); else if (b_) showVp(b_); else hov.innerHTML = ""; });   // 觸控螢幕：點一下顯示
   svg.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") hov.innerHTML = ""; });
-  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span>${mas.map(m => { const last = [...m.pts].reverse().find(v => v != null); return `<span><i style="background:${m.c}"></i>${m.label}${m.n}（${m.n} 日均線）${last != null ? "最新 " + fmt(last, dec) : ""}</span>`; }).join("")}<span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vp ? `<span><i style="background:var(--chart);opacity:.4"></i>VPVR 成交量分布：${vm_ === "year" ? sw.vpYear.start.slice(0, 4) + " 整年（日線，只畫目前圖軸範圍內的量）" : "10/6 起（15 分 K）"}；滑鼠移到柱上顯示股價與回補位</span>` : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}${scen.map(s => `<span><i style="background:${s.color};height:0;border-top:2px dashed ${s.color}"></i>${s.label}</span>`).join("")}${MEAS_ON ? "<span>📏 測量：按右上角「測量」，點起點、終點，自動算漲跌幅＝終點 ÷ 起點 − 1（吸附每日收盤，可畫多段）；點選後按 Delete 刪除，重新整理全部清除</span>" : ""}`;
+  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span>${mas.map(m => { const last = [...m.pts].reverse().find(v => v != null); return `<span><i style="background:${m.c}"></i>${m.label}${m.n}（${m.n} 日均線）${last != null ? "最新 " + fmt(last, dec) : ""}</span>`; }).join("")}<span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vp ? `<span><i style="background:var(--chart);opacity:.4"></i>VPVR 成交量分布：${vm_ === "year" ? sw.vpYear.start.slice(0, 4) + " 整年（日線，只畫目前圖軸範圍內的量）" : "10/6 起（15 分 K）"}；滑鼠移到柱上顯示股價與回補位</span>` : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}${scen.map(s => `<span><i style="background:${s.color};height:0;border-top:2px dashed ${s.color}"></i>${s.label}</span>`).join("")}${MEAS_ON ? "<span>📏 測量：按上方「測量」，點起點、終點，自動算漲跌幅＝終點 ÷ 起點 − 1（吸附每日收盤，可畫多段）；點選後按 Delete 刪除、畫到一半按 Esc 取消，重新整理全部清除</span>" : ""}`;
 }
 
 // VPVR 範圍開關（格式同 amd.html）：10/6 起／2026 整年／關；每張圖各自記住選擇
@@ -325,3 +326,13 @@ function bindWinSeg(redraw) {
     redraw(seg.dataset.win);
   });
 }
+
+// 📏 測量開關（放在情境模擬旁）：只在有滑鼠的電腦版顯示；按下切換測量模式，狀態存 drawRetrace.meas[id]
+const MEAS_OK = typeof matchMedia === "function" && matchMedia("(hover: hover) and (pointer: fine)").matches;
+const MEAS_SEG = id => MEAS_OK ? `<div class="ctl"><div class="seg" data-meas="${id}"><button type="button" aria-pressed="false">📏 測量</button></div></div>` : "";
+document.addEventListener("click", e => {
+  const b = e.target.closest && e.target.closest(".seg[data-meas] button"); if (!b) return;
+  const id = b.parentNode.dataset.meas, ms = ((drawRetrace.meas = drawRetrace.meas || {})[id] = (drawRetrace.meas || {})[id] || {list: [], mode: false, pick: null, sel: -1});
+  ms.mode = !ms.mode; ms.pick = null; ms.sel = -1;
+  if (drawRetrace.redraw && drawRetrace.redraw[id]) drawRetrace.redraw[id]();
+});

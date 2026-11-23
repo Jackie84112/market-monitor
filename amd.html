@@ -190,7 +190,7 @@
 </div>
 <div id="tip"></div>
 
-<script src="retrace.js?v=20261123m"></script>
+<script src="retrace.js?v=20261123p"></script>
 <script>
 const $ = id => document.getElementById(id);
 const tip = $("tip");
@@ -429,7 +429,7 @@ Promise.all([
   fetch("data/amd_pe.json", {cache: "no-store"}).then(r => r.json())
 ]).then(([a, s, sc, pe]) => {
   A = a; S = s; SC = sc; PE = pe;
-  $("rctl").outerHTML = MA_SEG("rchart", "AMD") + RSC_SEG() + WIN_SEG("rchart");
+  $("rctl").outerHTML = MA_SEG("rchart", "AMD") + RSC_SEG() + MEAS_SEG("rchart") + WIN_SEG("rchart");
   bindMaSeg(drawAmdRetrace); bindWinSeg(drawAmdRetrace);
   $("rscseg").onclick = e => { const b = e.target.closest && e.target.closest("button"); if (!b) return; const k = b.dataset.k; RSC[k] = !RSC[k]; b.classList.toggle("on", RSC[k]); b.setAttribute("aria-pressed", RSC[k]); drawAmdRetrace(); };
   render(); renderStatic(); syncSw(); drawScenario();

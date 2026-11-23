@@ -159,7 +159,7 @@
   </div></div>
 </div>
 <div id="tip"></div>
-<script src="retrace.js?v=20261123m"></script>
+<script src="retrace.js?v=20261123p"></script>
 <script>
 const $ = id => document.getElementById(id);
 const fmt = (v, d = 2) => v == null ? "—" : Number(v).toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
@@ -190,7 +190,7 @@ Promise.all([...KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).
     return `<div class="esep"></div><section class="card etf" style="--ec:${EC[i]}"><div class="head ehead"><div class="ecode">${esc(d.code)}</div>
       <div class="etit"><h2>${esc(d.name)}</h2><span>${short(sw.high.date)} 收盤高點至 ${short(sw.low.date)} 收盤低點；以收盤低點為原點，之後每日收盤</span></div>
       <div class="epx"><b>${fmt(lp[1], d.dec ?? 2)}</b><em class="${cc}">${ch == null ? "—" : (ch > 0 ? "+" : "") + fmt(ch, 2) + "%"}</em><small>${short(lp[0])}${d.live ? " 盤中" : " 收盤"}</small></div></div>
-      ${VP_SEG("rc" + i).replace(/<\/div>$/, MA_SEG("rc" + i, d.code) + SC_SEG(i) + WIN_SEG("rc" + i) + "</div>")}
+      ${VP_SEG("rc" + i).replace(/<\/div>$/, MA_SEG("rc" + i, d.code) + SC_SEG(i) + MEAS_SEG("rc" + i) + WIN_SEG("rc" + i) + "</div>")}
       <div id="rc${i}" style="width:100%"></div><div class="legend" id="rl${i}"></div></section>`;
   }).join("");
   const asof = arr.map(d => d.asof).sort().pop();
