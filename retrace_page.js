@@ -1,4 +1,4 @@
-// 回補走勢子頁共用腳本（聯發科 mediatek.html、博通 avgo.html、創意 guc.html、世芯 alchip.html）；圖的畫法與 amd.html 的「回補走勢」完全一致。
+// 回補走勢子頁共用腳本（聯發科 mediatek.html、博通 avgo.html、英偉達 nvda.html、創意 guc.html、世芯 alchip.html）；圖的畫法與 amd.html 的「回補走勢」完全一致。
 const $ = id => document.getElementById(id);
 const fmt = (v, d = 2) => v == null ? "—" : Number(v).toLocaleString("en-US", {minimumFractionDigits: d, maximumFractionDigits: d});
 const short = d => d ? d.slice(5).replace("-", "/") : "—";
