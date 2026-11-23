@@ -179,8 +179,47 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
     const last = mac[n - 1], yl = MY(last[1]), ys = MY(last[2]);
     g += `<text x="${W - R + 6}" y="${yl + (Math.abs(yl - ys) < 13 ? (last[1] > last[2] ? -4 : 12) : 3.5)}" font-size="10.5" fill="var(--chart)">MACD　${fmt(last[1], dec)}</text><text x="${W - R + 6}" y="${ys + (Math.abs(yl - ys) < 13 ? (last[1] > last[2] ? 12 : -4) : 3.5)}" font-size="10.5" fill="#D97706">信號　${fmt(last[2], dec)}</text>`;
   }
-  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="${DD.en} 回補走勢圖與每日成交量">${g}<g id="rhov"></g><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>`;
+  // 📏 測量（仿 TradingView 價格區間；只在有滑鼠的電腦版出現）：按鈕→點起點→點終點，吸附每日收盤；可畫多段，點選後按 Delete 刪除；重新整理即清空
+  const MEAS_ON = typeof matchMedia === "function" && matchMedia("(hover: hover) and (pointer: fine)").matches;
+  const ms = ((drawRetrace.meas = drawRetrace.meas || {})[el.id] = (drawRetrace.meas || {})[el.id] || {list: [], mode: false, pick: null, sel: -1});
+  (drawRetrace.redraw = drawRetrace.redraw || {})[el.id] = () => drawRetrace(el, data, leg);
+  const dI = Object.fromEntries(pts.map((p, i) => [p[0], i]));
+  const measBox = (i1, i2, selected) => {   // i1、i2＝pts 索引；一律以較早的日期為起點
+    if (i1 > i2) [i1, i2] = [i2, i1];
+    const p1 = pts[i1][1], p2 = pts[i2][1], up = p2 >= p1, col = up ? "var(--up)" : "var(--dn)";
+    const x1 = X(i1), x2 = X(i2), y1 = Y(p1), y2 = Y(p2), d = p2 - p1, pct = (p2 / p1 - 1) * 100;
+    const t1 = `${pct >= 0 ? "+" : ""}${fmt(pct, 2)}%（${d >= 0 ? "+" : ""}${fmt(d, dec)}）・${i2 - i1} 個交易日`;
+    const t2 = `${short(pts[i1][0])} ${fmt(p1, dec)} → ${short(pts[i2][0])} ${fmt(p2, dec)}`;
+    const bw = Math.max(t1.length * 7.4, t2.length * 6.6) + 20, bh = selected ? 56 : 42;
+    const bx = Math.max(L + 2, Math.min(W - R - bw - 2, (x1 + x2) / 2 - bw / 2));
+    const by = up ? (y2 - 10 - bh >= T ? y2 - 10 - bh : Math.min(y1 + 10, T + PH - bh)) : (y2 + 10 + bh <= T + PH ? y2 + 10 : Math.max(T, y1 - 10 - bh));
+    return {x1, x2, top: Math.min(y1, y2), bot: Math.max(y1, y2), bx, by, bw, bh, svg:
+      `<rect x="${x1}" y="${Math.min(y1, y2)}" width="${Math.max(1, x2 - x1)}" height="${Math.max(1, Math.abs(y2 - y1))}" fill="${col}" opacity="${selected ? .2 : .1}" stroke="${col}" stroke-width="${selected ? 1.6 : 0}" stroke-dasharray="4 3"/>
+      <line x1="${x1}" y1="${y1}" x2="${x2}" y2="${y2}" stroke="${col}" stroke-width="1.8"/><circle cx="${x1}" cy="${y1}" r="4" fill="#fff" stroke="${col}" stroke-width="2"/><circle cx="${x2}" cy="${y2}" r="4" fill="${col}" stroke="#fff" stroke-width="1.5"/>
+      <rect x="${bx}" y="${by}" width="${bw}" height="${bh}" rx="6" fill="#fff" stroke="${col}" stroke-width="${selected ? 2 : 1.2}"/>
+      <text x="${bx + 10}" y="${by + 18}" font-size="13" font-weight="700" fill="${col}">${t1}</text><text x="${bx + 10}" y="${by + 34}" font-size="11.5" fill="#4B5158">${t2}</text>
+      ${selected ? `<text x="${bx + 10}" y="${by + 49}" font-size="10.5" fill="#9AA0A6">按 Delete 刪除</text>` : ""}`};
+  };
+  const mShown = ms.list.map((m, k) => (m.a in dI && m.b in dI) ? {k, ...measBox(dI[m.a], dI[m.b], k === ms.sel)} : null).filter(Boolean);
+  const mg = mShown.map(m => m.svg).join("");
+  const mBtn = MEAS_ON ? `<button type="button" class="meas-btn" style="position:absolute;top:${T + 4}px;right:${R + 8}px;font:inherit;font-size:12.5px;padding:3px 10px;border-radius:999px;cursor:pointer;border:1px solid ${ms.mode ? "#22262B" : "#CFCDC6"};background:${ms.mode ? "#22262B" : "#fff"};color:${ms.mode ? "#fff" : "#22262B"}">📏 ${ms.mode ? (ms.pick ? "點終點（Esc 取消）" : "點起點（Esc 取消）") : "測量"}</button>` : "";
+  el.style.position = "relative";
+  el.innerHTML = `<svg width="${W}" height="${H}" role="img" aria-label="${DD.en} 回補走勢圖與每日成交量">${g}<g id="rmeas">${mg}</g><g id="rhov"></g><rect x="0" y="0" width="${W}" height="${H}" fill="transparent"/></svg>${mBtn}`;
   const svg = el.firstChild, hov = svg.querySelector("#rhov");
+  const snapI = e => { const x = e.clientX - svg.getBoundingClientRect().left; return Math.max(0, Math.min(n - 1, Math.round((x - L) / pw))); };
+  const inPlot = e => { const y = e.clientY - svg.getBoundingClientRect().top; return y >= T - 6 && y <= T + PH + 6; };
+  if (MEAS_ON) {
+    el.querySelector(".meas-btn").onclick = ev => { ev.stopPropagation(); ms.mode = !ms.mode; ms.pick = null; ms.sel = -1; drawRetrace.redraw[el.id](); };
+    if (!drawRetrace.keyBound) {   // 全頁只綁一次：Delete／Backspace 刪除選取的測量，Esc 取消畫到一半
+      drawRetrace.keyBound = true;
+      document.addEventListener("keydown", e => {
+        Object.entries(drawRetrace.meas || {}).forEach(([id, m]) => {
+          if ((e.key === "Delete" || e.key === "Backspace") && m.sel >= 0) { e.preventDefault(); m.list.splice(m.sel, 1); m.sel = -1; drawRetrace.redraw[id](); }
+          else if (e.key === "Escape" && (m.mode || m.sel >= 0)) { m.mode = false; m.pick = null; m.sel = -1; drawRetrace.redraw[id](); }
+        });
+      });
+    }
+  }
   // 滑鼠移到點上：該日回補水位的虛線＋浮標（浮標只有股價）；同一天的量柱加外框
   const show = i => {
     const v = pts[i][1], x = X(i), y = Y(v), txt = (hist ? short(pts[i][0]) + "　" : "") + fmt(v, dec) + mas.map(m => m.pts[i] != null ? "　" + m.label + m.n + " " + fmt(m.pts[i], dec) : "").join(""), w = txt.length * 7.6 + 18, h = 24;
@@ -209,18 +248,37 @@ function drawRetrace(el = $("rchart"), data = null, leg = $("rlegend")) {
       <text x="${L + vpW(b) + 6}" y="${y - 4}" font-size="11" fill="#4B5158" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${fmt(b[2], 1)} 百萬股</text>`;
   };
   svg.addEventListener("pointermove", e => {
+    if (ms.mode) {   // 測量模式：吸附到最近一天的收盤，選好起點後即時預覽
+      svg.style.cursor = "crosshair";
+      const i = snapI(e);
+      hov.innerHTML = ms.pick != null && ms.pick in dI && dI[ms.pick] !== i ? measBox(dI[ms.pick], i, false).svg
+        : `<circle cx="${X(i)}" cy="${Y(pts[i][1])}" r="6" fill="none" stroke="${ACC}" stroke-width="2"/><text x="${X(i)}" y="${Y(pts[i][1]) - 11}" font-size="11.5" font-weight="600" fill="${ACC}" text-anchor="middle" style="paint-order:stroke;stroke:#fff;stroke-width:3px">${short(pts[i][0])} ${fmt(pts[i][1], dec)}</text>`;
+      return;
+    }
     const i = near(e), vb_ = i < 0 ? vpHit(e) : null;
     if (vb_) { svg.style.cursor = "default"; showVp(vb_); return; }
     { const yy = e.clientY - svg.getBoundingClientRect().top; svg.style.cursor = i >= 0 || bands.some(b => yy >= b[0] && yy <= b[1]) ? "pointer" : "default"; }
     if (i >= 0) show(i); else hov.innerHTML = "";
   });
   svg.addEventListener("click", e => {   // 點面板標題列：收合／展開，重畫
+    if (ms.mode && inPlot(e)) {   // 測量：第一下＝起點，第二下＝終點（同一天不算）
+      const d = pts[snapI(e)][0];
+      if (ms.pick == null) ms.pick = d;
+      else if (d !== ms.pick) { ms.list.push({a: ms.pick, b: d}); ms.pick = null; ms.mode = false; ms.sel = -1; }
+      drawRetrace.redraw[el.id](); return;
+    }
+    if (MEAS_ON && inPlot(e)) {   // 點到已畫的測量（框或標籤）＝選取，可按 Delete 刪除；點空白處取消選取
+      const r = svg.getBoundingClientRect(), x = e.clientX - r.left, yy = e.clientY - r.top;
+      const hit = [...mShown].reverse().find(m => (x >= m.x1 - 4 && x <= m.x2 + 4 && yy >= m.top - 4 && yy <= m.bot + 4) || (x >= m.bx && x <= m.bx + m.bw && yy >= m.by && yy <= m.by + m.bh));
+      const nsel = hit ? hit.k : -1;
+      if (nsel !== ms.sel) { ms.sel = nsel; drawRetrace.redraw[el.id](); return; }
+    }
     const y = e.clientY - svg.getBoundingClientRect().top, b = bands.find(b => y >= b[0] && y <= b[1]);
     if (b) { st[b[2]] = !st[b[2]]; drawRetrace(el, data, leg); }
   });
   svg.addEventListener("pointerdown", e => { const i = near(e), b_ = i < 0 ? vpHit(e) : null; if (i >= 0) show(i); else if (b_) showVp(b_); else hov.innerHTML = ""; });   // 觸控螢幕：點一下顯示
   svg.addEventListener("pointerleave", e => { if (e.pointerType !== "touch") hov.innerHTML = ""; });
-  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span>${mas.map(m => { const last = [...m.pts].reverse().find(v => v != null); return `<span><i style="background:${m.c}"></i>${m.label}${m.n}（${m.n} 日均線）${last != null ? "最新 " + fmt(last, dec) : ""}</span>`; }).join("")}<span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vp ? `<span><i style="background:var(--chart);opacity:.4"></i>VPVR 成交量分布：${vm_ === "year" ? sw.vpYear.start.slice(0, 4) + " 整年（日線，只畫目前圖軸範圍內的量）" : "10/6 起（15 分 K）"}；滑鼠移到柱上顯示股價與回補位</span>` : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}${scen.map(s => `<span><i style="background:${s.color};height:0;border-top:2px dashed ${s.color}"></i>${s.label}</span>`).join("")}`;
+  leg.innerHTML = `<span><i style="background:var(--chart)"></i>每日收盤</span>${mas.map(m => { const last = [...m.pts].reverse().find(v => v != null); return `<span><i style="background:${m.c}"></i>${m.label}${m.n}（${m.n} 日均線）${last != null ? "最新 " + fmt(last, dec) : ""}</span>`; }).join("")}<span><i style="background:#6B7178;height:0;border-top:2px dashed #6B7178"></i>固定回補位（38.2% / 50% / 61.8%）</span><span><i style="background:${ACC};height:0;border-top:2px dashed ${ACC}"></i>滑鼠所在點的回補位</span>${vp ? `<span><i style="background:var(--chart);opacity:.4"></i>VPVR 成交量分布：${vm_ === "year" ? sw.vpYear.start.slice(0, 4) + " 整年（日線，只畫目前圖軸範圍內的量）" : "10/6 起（15 分 K）"}；滑鼠移到柱上顯示股價與回補位</span>` : ""}${vols ? "<span>量柱：紅漲綠跌</span>" : ""}${mac ? '<span><i style="background:#F59E0B"></i>MACD 信號線</span><span><i style="background:var(--chart)"></i>MACD 線</span><span>MACD 柱：紅正綠負</span>' : ""}${scen.map(s => `<span><i style="background:${s.color};height:0;border-top:2px dashed ${s.color}"></i>${s.label}</span>`).join("")}${MEAS_ON ? "<span>📏 測量：按右上角「測量」，點起點、終點，自動算漲跌幅＝終點 ÷ 起點 − 1（吸附每日收盤，可畫多段）；點選後按 Delete 刪除，重新整理全部清除</span>" : ""}`;
 }
 
 // VPVR 範圍開關（格式同 amd.html）：10/6 起／2026 整年／關；每張圖各自記住選擇
