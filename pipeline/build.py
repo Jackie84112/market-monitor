@@ -165,7 +165,7 @@ def us_session(ts):
 
 
 def taifex_txf():
-    """台指期近月：期交所報價接口，日盤（-F）與夜盤（-M）合併。夜盤過午夜仍記開盤日，時間早於 15:00 要加一天。"""
+    """台指期（取近月合約，與 Yahoo ES=F 等連續近月一致；2026-11-23 使用者要求頁面不標「近月」）：期交所報價接口，日盤（-F）與夜盤（-M）合併。夜盤過午夜仍記開盤日，時間早於 15:00 要加一天。"""
     head = {**UA, "Content-Type": "application/json;charset=UTF-8", "Origin": "https://mis.taifex.com.tw", "Referer": "https://mis.taifex.com.tw/futures/"}
     api = lambda ep, body: requests.post(f"https://mis.taifex.com.tw/futures/api/{ep}", json=body, headers=head, timeout=30).json()["RtData"]
     sessions = []
@@ -191,7 +191,7 @@ def taifex_txf():
     # 同一結算價底下的夜盤＋日盤接成一條線；新夜盤開始後只畫新夜盤
     bars = sorted((b for x in sessions if x is cur or x["ref"] == cur["ref"] for b in x["bars"]), key=lambda b: b[0])
     thin = [b for i, b in enumerate(bars) if i % 15 == 0 or i == len(bars) - 1]
-    return {"key": "txf_q", "name": "台指期（近月）", "last": cur["last"], "chg": round((cur["last"] / cur["ref"] - 1) * 100, 2), "time": int(cur["time"].timestamp()), "digits": 0,
+    return {"key": "txf_q", "name": "台指期", "last": cur["last"], "chg": round((cur["last"] / cur["ref"] - 1) * 100, 2), "time": int(cur["time"].timestamp()), "digits": 0,
             "line": [[t.strftime("%m-%d %H:%M"), v] for t, v in thin], "base": cur["ref"], "extra": "夜盤" if cur["night"] else "日盤"}
 
 
