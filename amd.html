@@ -97,13 +97,6 @@
     <div class="ctl" style="margin:0 0 8px"><span style="font-size:13px;color:var(--muted)">VPVR 範圍</span><div class="seg" id="vpseg"><button type="button" data-m="swing" class="on">10/6 起</button><button type="button" data-m="year">2026 整年</button><button type="button" data-m="off">關</button></div><span id="rctl"></span></div>
     <div id="rchart" style="width:100%"></div>
     <div class="legend" id="rlegend"></div>
-    <div class="notes">
-      <p>[註]：下方量柱為當日成交量（百萬股），紅柱代表當日收盤高於前一日、綠柱代表低於前一日；最左邊是低點當天的全日成交量。</p>
-      <p>[註]：MACD 為收盤價 EMA12 − EMA26，信號線為其 9 日 EMA，柱 = MACD − 信號；數值以含低點之前的完整日線計算，柱上數字為柱值。</p>
-      <p>[註]：橫向淡藍柱為 VPVR（成交量分布）：10/6 高點日起，用 15 分 K，每根的量平均攤在它的最低～最高價之間，每格 10 美元；滑鼠移到橫條上，左邊顯示該格股價、右邊顯示回補水位。低於圖軸底（低點）的量不計入。</p>
-      <p>[註]：VPVR 可切換範圍：「10/6 起」用 15 分 K；「2026 整年」用日線（每日量平均攤在當日高低之間，精度較粗），低於圖軸底 402.10 或高於 658.52 的量不畫，所以整年版只看得到落在這段價位內的量。</p>
-      <p>[註]：時間範圍可切 1 個月／3 個月／6 個月／2026（約兩年日線），成交量與 MACD 跟著同一時間窗；再點一次已選的按鈕回到回補段。均線為收盤價簡單移動平均，AMD 用美股慣例：月線20、季線50、半年線100、年線200（與 TradingView 預設一致），四個按鈕可疊加、預設不畫，只算到最新收盤日。</p>
-    </div>
   </section>
 
   <section class="card">
