@@ -234,10 +234,6 @@ def build():
              # 低點之後每日 [日期, 收盤, 成交量（百萬股）, 當日漲跌幅 %]，供「回補走勢」圖
              "path": [[x["d"], r2(x["c"]), r2(V[i], 1), r2((x["c"] / rows[i - 1]["c"] - 1) * 100)] for i, x in enumerate(rows) if x["d"] > SWING_LOW_DATE],
              "levels": [{"name": f"{p * 100:.1f}%", "v": r2(lo + p * (hi - lo)), "hit": cur >= lo + p * (hi - lo)} for p in RETRACE]}
-    # 剛創新低（原點後不到 5 個交易日）：原點前補跌下來的收盤，湊滿約 10 點，回補圖才不會只剩一個點（retrace.js 的 sw.pre）
-    _after = len(swing["path"])
-    if _after < 5:
-        swing["pre"] = [[rows[i]["d"], r2(C[i])] for i in range(max(rows.index(hi_row), lo_i - (10 - _after - 1)), lo_i)]
     # 長日線歷史（回補走勢圖的時間範圍與均線開關用，格式同 retrace.py）：[日期, 收盤, 量(百萬股), 漲跌%, MACD線, 信號線, 柱]
     swing["hist"] = [[rows[i]["d"], r2(C[i]), r2(V[i], 1), r2((C[i] / C[i - 1] - 1) * 100),
                       r2(_l[i]), r2(_s[i]), r2(_l[i] - _s[i])] for i in range(1, n)]

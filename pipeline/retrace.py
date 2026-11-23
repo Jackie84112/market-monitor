@@ -44,9 +44,6 @@ def build(s):
              "macd": macd, "lowVol": r2(V[li], 1), "lowChg": r2((lo_row["c"] / rows[li - 1]["c"] - 1) * 100),
              "path": [[x["d"], r2(x["c"]), r2(V[i], 1), r2((x["c"] / rows[i - 1]["c"] - 1) * 100)] for i, x in enumerate(rows) if x["d"] > s["low"]],
              "levels": [{"name": f"{p * 100:.1f}%", "v": r2(lo + p * (hi - lo)), "hit": cur >= lo + p * (hi - lo)} for p in RETRACE]}
-    after = len(swing["path"])
-    if after < 5:   # 剛創新低（原點後不到 5 個交易日）：原點前補跌下來的收盤，湊滿約 10 點（retrace.js 的 sw.pre，與 etf.html 指數列同規則）
-        swing["pre"] = [[rows[i]["d"], r2(rows[i]["c"])] for i in range(max(rows.index(hi_row), li - (10 - after - 1)), li)]
     if s.get("hist"):   # 長日線歷史（時間範圍開關用）：[日期, 收盤, 量(百萬股), 漲跌%, MACD線, 信號線, 柱]
         swing["hist"] = [[rows[i]["d"], r2(rows[i]["c"]), r2(V[i], 1), r2((rows[i]["c"] / rows[i - 1]["c"] - 1) * 100),
                           r2(line[i]), r2(sig[i]), r2(line[i] - sig[i])] for i in range(1, len(rows))]
