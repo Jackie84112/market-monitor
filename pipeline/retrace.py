@@ -57,8 +57,16 @@ def build(s):
         except Exception as e:
             print("ERR vpvr", s["key"], e)
         swing["vpYear"] = vpvr_daily(rows, YEAR_START, lo, hi, s["vpvr"])   # 拉長對照：2026 整年（日線）
+    # 位置摘要（晶片專題頁開頭「個股位置」用，算法同首頁指數位置 build.index_position）：6/1 起收盤＋高點/原點/回補/下一關卡/大跌前收盤
+    pos = None
+    try:
+        from build import index_position, CHART_START
+        cl = [[x["d"], x["c"]] for x in rows]
+        pos = {"series": [[d, r2(v)] for d, v in cl if d >= CHART_START], **index_position(cl, live, s["low"])}
+    except Exception as e:
+        print("ERR pos", s["key"], e)
     return {"lowWord": "收盤低" if s.get("close") else "最低", "updated": dt.datetime.now(TW).strftime("%Y/%m/%d %H:%M"), "name": s["name"], "en": s["en"], "code": s["code"],
-            "dec": s["dec"], "asof": rows[-1]["d"], "live": live, "swing": swing,
+            "dec": s["dec"], "asof": rows[-1]["d"], "live": live, "swing": swing, "pos": pos,
             "status": {"Yahoo": {"ok": True, "asof": rows[-1]["d"], "err": None}}}
 
 
