@@ -247,15 +247,9 @@ Promise.all([...KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).
     });
     svg.addEventListener("pointerleave", () => { ch.style.display = "none"; tip.style.display = "none"; });
   }
-  // 指數列展開：共用回補走勢圖；剛創新低（低點後不到 5 個交易日）時原點前補跌下來的走勢
-  function idxPre(x) {
-    const after = x.series.filter(p => p[0] > x.low[0]).length;
-    if (after >= 5) return [];
-    const before = x.series.filter(p => p[0] < x.low[0] && p[0] >= x.peak[0]);
-    return before.slice(Math.max(0, before.length - (10 - after - 1))).map(p => [p[0], p[1]]);
-  }
+  // 指數列展開：共用回補走勢圖，一律從原點開始畫（2026-11-23 使用者要求，不補原點前走勢）
   const idxRetrace = x => ({en: x.name, dec: x.last < 1000 ? 2 : 0, lowWord: "收盤低", swing: {high: {date: x.peak[0], v: x.peak[1]}, low: {date: x.low[0], v: x.low[1]},
-    pre: idxPre(x), path: x.series.filter(p => p[0] > x.low[0]).map(p => [p[0], p[1]]),
+    path: x.series.filter(p => p[0] > x.low[0]).map(p => [p[0], p[1]]),
     levels: x.levels.slice(0, 3).map(l => ({name: l.name, v: l.v}))}});
   function drawIdxDetail(tr) {
     const x = IX.find(y => y.key === tr.dataset.i), td = tr.firstChild;
