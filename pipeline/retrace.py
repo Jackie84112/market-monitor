@@ -17,6 +17,7 @@ from amd import daily, ema, r2, RETRACE, TW, vpvr, vpvr_daily, YEAR_START  # noq
 ROOT = Path(__file__).resolve().parent.parent
 STOCKS = [
     {"key": "mediatek", "sym": "2454.TW", "name": "聯發科", "en": "MediaTek", "code": "2454", "high": "2026-10-06", "low": "2026-11-20", "dec": 0, "ccy": "TWD", "close": True, "vpvr": 50, "hist": True},
+    {"key": "amd_r", "sym": "AMD", "name": "超微", "en": "AMD", "code": "AMD", "high": "2026-10-06", "low": "2026-11-20", "dec": 2, "ccy": "USD", "close": True, "vpvr": 5, "hist": True},   # 晶片專題頁用（同 ETF 格式）；amd.html 仍讀 amd.json
     {"key": "avgo", "sym": "AVGO", "name": "博通", "en": "Broadcom", "code": "AVGO", "high": "2026-10-06", "low": "2026-11-20", "dec": 2, "ccy": "USD", "close": True, "vpvr": 1, "hist": True},
     {"key": "nvda", "sym": "NVDA", "name": "英偉達", "en": "NVIDIA", "code": "NVDA", "high": "2026-10-06", "low": "2026-11-20", "dec": 2, "ccy": "USD", "close": True, "vpvr": 2, "hist": True},
     {"key": "guc", "sym": "3443.TW", "name": "創意", "en": "Global Unichip", "code": "3443", "high": "2026-10-06", "low": "2026-11-20", "dec": 0, "ccy": "TWD", "close": True, "vpvr": 50, "hist": True},
