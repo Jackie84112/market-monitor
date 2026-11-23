@@ -260,7 +260,7 @@ Promise.all([...KEYS.map(k => fetch("data/" + k + ".json", {cache: "no-store"}).
   function drawIdxDetail(tr) {
     const x = IX.find(y => y.key === tr.dataset.i), td = tr.firstChild;
     if (!td.firstChild) td.innerHTML = `<div class="dt-t">${esc(x.name)} 回補走勢：以 ${short(x.low[0])} 收盤為原點（0%），之後每日收盤，跌破原點為負；滑鼠移到點上顯示該日回補水位</div><div id="ir_${x.key}" style="width:100%"></div><div class="legend" id="il_${x.key}"></div>
-      <div class="notes"><p>[註1]：高點＝${short(x.peak[0])} 收盤、原點＝${short(x.low[0])} 收盤，兩者固定不隨之後的新低移動（亞股以美股大跌隔天為原點）；回補位 = 低點 + 比例 ×（高點 − 低點），38.2%、50%、61.8% 為常用比例，不具預測力。</p></div>`;
+      <div class="notes"><p>[註1]：高點＝${short(x.peak[0])} 收盤、原點＝${short(x.low[0])} 收盤，兩者固定不隨之後的新低移動；回補位 = 低點 + 比例 ×（高點 − 低點），38.2%、50%、61.8% 為常用比例，不具預測力。</p></div>`;
     drawRetrace($("ir_" + x.key), idxRetrace(x), $("il_" + x.key));
   }
   function drawIdx() {

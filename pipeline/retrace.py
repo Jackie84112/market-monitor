@@ -16,13 +16,13 @@ from amd import daily, ema, r2, RETRACE, TW, vpvr, vpvr_daily, YEAR_START  # noq
 
 ROOT = Path(__file__).resolve().parent.parent
 STOCKS = [
-    {"key": "mediatek", "sym": "2454.TW", "name": "聯發科", "en": "MediaTek", "code": "2454", "high": "2026-10-06", "low": "2026-11-06", "dec": 0, "ccy": "TWD", "close": True, "vpvr": 50, "hist": True},
-    {"key": "avgo", "sym": "AVGO", "name": "博通", "en": "Broadcom", "code": "AVGO", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True},
+    {"key": "mediatek", "sym": "2454.TW", "name": "聯發科", "en": "MediaTek", "code": "2454", "high": "2026-10-06", "low": "2026-11-20", "dec": 0, "ccy": "TWD", "close": True, "vpvr": 50, "hist": True},
+    {"key": "avgo", "sym": "AVGO", "name": "博通", "en": "Broadcom", "code": "AVGO", "high": "2026-10-06", "low": "2026-11-20", "dec": 2, "ccy": "USD", "close": True},
     # ETF 監控子頁（etf.html）四檔；低點日期手動設定（高點之後最低收盤價所在日）
-    {"key": "etf_0050", "sym": "0050.TW", "name": "元大台灣50", "en": "Yuanta Taiwan 50 ETF", "code": "0050", "high": "2026-10-06", "low": "2026-11-06", "dec": 2, "ccy": "TWD", "close": True, "vpvr": 0.5, "hist": True},
-    {"key": "etf_soxx", "sym": "SOXX", "name": "iShares 半導體 ETF", "en": "iShares Semiconductor ETF", "code": "SOXX", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True, "vpvr": 1, "hist": True},
-    {"key": "etf_qqq", "sym": "QQQ", "name": "Invesco 那斯達克100 ETF", "en": "Invesco QQQ Trust", "code": "QQQ", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True, "vpvr": 2, "hist": True},
-    {"key": "etf_spy", "sym": "SPY", "name": "SPDR 標普500 ETF", "en": "SPDR S&P 500 ETF", "code": "SPY", "high": "2026-10-06", "low": "2026-11-05", "dec": 2, "ccy": "USD", "close": True, "vpvr": 1, "hist": True},
+    {"key": "etf_0050", "sym": "0050.TW", "name": "元大台灣50", "en": "Yuanta Taiwan 50 ETF", "code": "0050", "high": "2026-10-06", "low": "2026-11-20", "dec": 2, "ccy": "TWD", "close": True, "vpvr": 0.5, "hist": True},
+    {"key": "etf_soxx", "sym": "SOXX", "name": "iShares 半導體 ETF", "en": "iShares Semiconductor ETF", "code": "SOXX", "high": "2026-10-06", "low": "2026-11-20", "dec": 2, "ccy": "USD", "close": True, "vpvr": 1, "hist": True},
+    {"key": "etf_qqq", "sym": "QQQ", "name": "Invesco 那斯達克100 ETF", "en": "Invesco QQQ Trust", "code": "QQQ", "high": "2026-10-06", "low": "2026-11-20", "dec": 2, "ccy": "USD", "close": True, "vpvr": 2, "hist": True},
+    {"key": "etf_spy", "sym": "SPY", "name": "SPDR 標普500 ETF", "en": "SPDR S&P 500 ETF", "code": "SPY", "high": "2026-10-06", "low": "2026-11-20", "dec": 2, "ccy": "USD", "close": True, "vpvr": 1, "hist": True},
 ]
 
 
@@ -44,6 +44,9 @@ def build(s):
              "macd": macd, "lowVol": r2(V[li], 1), "lowChg": r2((lo_row["c"] / rows[li - 1]["c"] - 1) * 100),
              "path": [[x["d"], r2(x["c"]), r2(V[i], 1), r2((x["c"] / rows[i - 1]["c"] - 1) * 100)] for i, x in enumerate(rows) if x["d"] > s["low"]],
              "levels": [{"name": f"{p * 100:.1f}%", "v": r2(lo + p * (hi - lo)), "hit": cur >= lo + p * (hi - lo)} for p in RETRACE]}
+    after = len(swing["path"])
+    if after < 5:   # 剛創新低（原點後不到 5 個交易日）：原點前補跌下來的收盤，湊滿約 10 點（retrace.js 的 sw.pre，與 etf.html 指數列同規則）
+        swing["pre"] = [[rows[i]["d"], r2(rows[i]["c"])] for i in range(max(rows.index(hi_row), li - (10 - after - 1)), li)]
     if s.get("hist"):   # 長日線歷史（時間範圍開關用）：[日期, 收盤, 量(百萬股), 漲跌%, MACD線, 信號線, 柱]
         swing["hist"] = [[rows[i]["d"], r2(rows[i]["c"]), r2(V[i], 1), r2((rows[i]["c"] / rows[i - 1]["c"] - 1) * 100),
                           r2(line[i]), r2(sig[i]), r2(line[i] - sig[i])] for i in range(1, len(rows))]
