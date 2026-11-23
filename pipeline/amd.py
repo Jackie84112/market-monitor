@@ -71,6 +71,27 @@ def twse_days(stock, dates):
     return out
 
 
+def twse_mis(sym):
+    """證交所即時報價（mis.twse.com.tw）當日收盤後的官方收盤 {d,o,h,l,c,v}；盤中或查不到回 None。
+    2026-11-23 使用者要求：Yahoo 台股延遲約 15–20 分且常漏 13:30 收盤集合競價（0050 停在 13:21 的 86.65，官方收 87.00），
+    所以台股（.TW 上市／.TWO 上櫃）收盤後的最新一根一律改用這裡的值。量為張 ×1000＝股（與 Yahoo 同單位）。"""
+    if not sym.endswith((".TW", ".TWO")):
+        return None
+    ex = "otc" if sym.endswith(".TWO") else "tse"
+    code = sym.rsplit(".", 1)[0]
+    try:
+        r = requests.get("https://mis.twse.com.tw/stock/api/getStockInfo.jsp",
+                         params={"ex_ch": f"{ex}_{code}.tw", "json": "1", "delay": "0"}, headers=UA, timeout=20)
+        a = (r.json().get("msgArray") or [None])[0]
+        if not a or a.get("t", "") < "13:30:00":
+            return None
+        f = lambda k: float(a[k])
+        d = a["d"]
+        return {"d": f"{d[:4]}-{d[4:6]}-{d[6:]}", "o": f("o"), "h": f("h"), "l": f("l"), "c": f("z"), "v": f("v") * 1000}
+    except Exception:
+        return None
+
+
 def daily(sym, rng="2y"):
     """回傳 (日線列 [{d,o,h,l,c,v}], 是否盤中, 最新成交時間)。日期為交易所當地日期。"""
     url = f"https://query1.finance.yahoo.com/v8/finance/chart/{requests.utils.quote(sym)}?range={rng}&interval=1d"
@@ -108,6 +129,13 @@ def daily(sym, rng="2y"):
                 pass
             out.append({"d": md, "o": o if o is not None else (out[-1]["c"] if out else mp), "h": m["regularMarketDayHigh"],
                         "l": m["regularMarketDayLow"], "c": mp, "v": m.get("regularMarketVolume") or 0})
+    # 台股收盤後：最新一根改用證交所官方收盤（覆蓋 Yahoo 延遲值，或補上 Yahoo 還沒有的當日）
+    tw = twse_mis(sym)
+    if tw and out and tw["d"] >= out[-1]["d"]:
+        if tw["d"] == out[-1]["d"]:
+            out[-1] = tw
+        else:
+            out.append(tw)
     per, now =(m.get("currentTradingPeriod") or {}).get("regular") or {}, time.time()
     live = bool(per) and per["start"] <= now < per["end"] and out[-1]["d"] == dt.datetime.fromtimestamp(now + off, dt.timezone.utc).strftime("%Y-%m-%d")
     return out, live, m.get("regularMarketTime")

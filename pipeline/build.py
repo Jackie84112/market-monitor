@@ -124,7 +124,13 @@ def yahoo(sym, adjusted=False):
         md = day(mt)
         if not out or md > max(out):
             out[md] = mp
-    rows = [[d, v] for d, v in sorted(out.items())]
+    # 台股收盤後：最新一根改用證交所官方收盤（Yahoo 延遲且常漏 13:30 集合競價，2026-11-23 使用者要求）
+    if sym.endswith((".TW", ".TWO")) and out:
+        from amd import twse_mis
+        tw = twse_mis(sym)
+        if tw and tw["d"] >= max(out):
+            out[tw["d"]] = tw["c"]
+    rows =[[d, v] for d, v in sorted(out.items())]
     per, now = (m.get("currentTradingPeriod") or {}).get("regular") or {}, time.time()
     live = bool(per) and per["start"] <= now < per["end"] and rows[-1][0] == dt.datetime.fromtimestamp(now + off, dt.timezone.utc).strftime("%Y-%m-%d")
     return rows, live, m.get("regularMarketTime")
