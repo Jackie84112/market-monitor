@@ -124,7 +124,7 @@ def yahoo(sym, adjusted=False):
         md = day(mt)
         if not out or md > max(out):
             out[md] = mp
-    # 台股收盤後：最新一根改用證交所官方收盤（Yahoo 延遲且常漏 13:30 集合競價，2026-11-23 使用者要求）
+    # 台股最新一根一律用證交所（盤中即時價、收盤後官方收盤；Yahoo 延遲且常漏 13:30 集合競價，2026-11-23／11-26 使用者要求）
     if sym.endswith((".TW", ".TWO")) and out:
         from amd import twse_mis
         tw = twse_mis(sym)

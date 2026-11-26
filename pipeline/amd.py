@@ -72,7 +72,7 @@ def twse_days(stock, dates):
 
 
 def twse_mis(sym):
-    """證交所即時報價（mis.twse.com.tw）當日收盤後的官方收盤 {d,o,h,l,c,v}；盤中或查不到回 None。
+    """證交所即時報價（mis.twse.com.tw）當日最新一根 {d,o,h,l,c,v}（盤中＝即時價、收盤後＝官方收盤）；查不到回 None。
     2026-11-23 使用者要求：Yahoo 台股延遲約 15–20 分且常漏 13:30 收盤集合競價（0050 停在 13:21 的 86.65，官方收 87.00），
     所以台股（.TW 上市／.TWO 上櫃）收盤後的最新一根一律改用這裡的值。量為張 ×1000＝股（與 Yahoo 同單位）。"""
     if not sym.endswith((".TW", ".TWO")):
@@ -83,11 +83,17 @@ def twse_mis(sym):
         r = requests.get("https://mis.twse.com.tw/stock/api/getStockInfo.jsp",
                          params={"ex_ch": f"{ex}_{code}.tw", "json": "1", "delay": "0"}, headers=UA, timeout=20)
         a = (r.json().get("msgArray") or [None])[0]
-        if not a or a.get("t", "") < "13:30:00":
+        if not a or not a.get("d"):
+            return None
+        # 2026-11-26 使用者要求每次更新都用最新數據：盤中也用這裡（Yahoo 晚 15–20 分，開盤初段常整根缺）。
+        # 盤中 z（最近成交）常為 "-"（5 秒內無成交），依序退到 pz、最佳買價
+        px = next((v for v in (a.get("z"), a.get("pz"), (a.get("b") or "").split("_")[0]) if v and v != "-"), None)
+        if px is None:
             return None
         f = lambda k: float(a[k])
         d = a["d"]
-        return {"d": f"{d[:4]}-{d[4:6]}-{d[6:]}", "o": f("o"), "h": f("h"), "l": f("l"), "c": f("z"), "v": f("v") * 1000}
+        return {"d": f"{d[:4]}-{d[4:6]}-{d[6:]}", "o": f("o"), "h": max(f("h"), float(px)), "l": min(f("l"), float(px)),
+                "c": float(px), "v": f("v") * 1000}
     except Exception:
         return None
 
