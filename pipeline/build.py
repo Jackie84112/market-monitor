@@ -31,6 +31,7 @@ PEAK_DATE = "2026-10-06"    # 回補關卡統一起算的高點日（換波段�
 LOW_DATE = {"us": "2026-11-20", "asia": "2026-11-20"}
 ASIA_KEYS = {"t0050", "kospi"}
 CHART_START = "2026-06-01"  # 指數走勢圖起始日
+INDEX_CHART_START = "2026-06-22"  # ETF 頁「指數位置」走勢圖起始日(2026-11-26 使用者要求)
 RETRACE = (0.382, 0.5, 0.618)
 # Put/Call 事件對照：最後一個是本次（頁面以強調色畫），新增事件往後加
 # (名稱, 事件日＝最恐慌那天, 下跌前＝SOX 前高收盤日)；SOX 前高＝事件日前約 60 個交易日內最高收盤（2026-11-19 算定，使用者要求用 SOX）
@@ -591,7 +592,7 @@ def main():
     indices = []
     for k, n, sym in INDICES:
         if S(k):
-            indices.append({"key": k, "name": n, "sym": sym, "series": [[d, round(v, 2)] for d, v in S(k) if d >= CHART_START], **index_position(S(k), bool(live.get(k)), LOW_DATE["asia" if k in ASIA_KEYS else "us"])})
+            indices.append({"key": k, "name": n, "sym": sym, "series": [[d, round(v, 2)] for d, v in S(k) if d >= INDEX_CHART_START], **index_position(S(k), bool(live.get(k)), LOW_DATE["asia" if k in ASIA_KEYS else "us"])})
 
     try:
         pcev = pc_events(store)
