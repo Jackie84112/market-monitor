@@ -146,6 +146,9 @@ def intraday(sym, prepost=False, gap=2.25 * 3600):
     r.raise_for_status()
     j = r.json()["chart"]["result"][0]
     bars = [(t, c) for t, c in zip(j["timestamp"], j["indicators"]["quote"][0]["close"]) if c is not None]
+    m = j.get("meta", {})
+    if m.get("regularMarketPrice") and bars and m.get("regularMarketTime", 0) > bars[-1][0]:
+        bars.append((m["regularMarketTime"], m["regularMarketPrice"]))   # 亞洲時段 15 分 K 常斷 2 小時以上，meta 報價較新就補成最後一點
     if not bars:
         return [], None, None
     last_t, et = bars[-1][0], ZoneInfo("America/New_York")
